@@ -87,9 +87,42 @@ def pol_ker(x1,x2,gamma):
     K=(np.dot(x1,x2.T)+1)**gamma
     return K
 
+
 def prediction(alfa,x1,x2,Y,gamma,epsilon,C):
     #RIVEDI
     return
+
+
+def init_M(alfa, y_train, epsilon, C, Kernel):
+    P = y_train.shape[0]
+    Y = y_train*np.eye(P)
+    Q = np.dot(np.dot(Y, Kernel), Y)
+    
+    fun = -(np.dot(Q, alfa) - 1) * y_train  #= - (np.dot(Q, alpha) - np.ones(P).reshape(-1, 1)) * y_train
+    
+    S_a = np.where(
+        np.logical_or(
+            np.logical_and(alfa < C-epsilon, y_train==-1), np.logical_and(alfa > epsilon ,y_train == 1)))[0]
+    
+    M = np.min(fun[S_a])
+        
+    return M
+
+
+def init_m(alfa, y_train, epsilon, C, K):
+    P = y_train.shape[0]
+    Y = y_train*np.eye(P)
+    Q = np.dot(np.dot(Y, K), Y)
+    
+    fun = -(np.dot(Q, alfa) - 1) * y_train  #= - (np.dot(Q, alpha) - np.ones(P).reshape(-1, 1)) * y_train
+    
+    R_a = np.where(
+        np.logical_or(
+            np.logical_and(alfa < C-epsilon, y_train==1), np.logical_and(alfa > epsilon ,y_train == -1)))[0]
+    
+    m = np.max(fun[R_a])
+    
+    return m
 
 def main(x_train,x_test,y_train,y_test,gamma,C):
     P = y_train.shape[0]
@@ -103,11 +136,11 @@ def main(x_train,x_test,y_train,y_test,gamma,C):
 
     #Inequality constraints
     G = matrix(np.concatenate((np.eye(P), -np.eye(P)))) #vincoli
-    h = matrix(np.concatenate((np.ones((P, 1)) * C, np.zeros((P, 1))))) #termini noti
+    h = matrix(np.concatenate((C*np.ones((P, 1)), np.zeros((P, 1))))) #termini noti
 
     #Equality constraints
-    A = matrix(y_train.reshape(1, -1))#vincoli
-    b = matrix(np.array([0.])) #termini noti
+    A = matrix(y_train.T)#vincoli #trans
+    b = matrix(np.array([0.])) #termini noti #np.zeros(1)
 
     start = time.time()
     opt = solvers.qp(Q, e, G, h, A, b, solver="cvxopt")
@@ -121,5 +154,10 @@ def main(x_train,x_test,y_train,y_test,gamma,C):
     acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size 
 
     pred_test = prediction(alfa_star,x_train,x_test,y_train,gamma,eps,C) 
-    acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size 
+    acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size
+    
+    M = init_M(alfa_star, y_train, eps, C, Kernel)
+    m = init_m(alfa_star, y_train, eps, C, Kernel) 
+    
+    
     return
