@@ -3,7 +3,7 @@ from functions_1_AWS import *
 #hyperparams----------------------------------------------------------------------------
 gamma=2
 C=10
-eps=1e-1
+eps=1e-4
 #DIFFERENZIAZZIONE TRA EPS(PER M E m) E EPS PER CLASSIFIER (?)
 
 #DATA adjustment and normalization-----------------------------------------------------

@@ -72,27 +72,36 @@ def pol_ker(x1,x2,gamma):
     K=(x1 @ x2.T + 1) ** gamma
     return K
 
-
 def prediction(alfa,x1,x2,y,gamma,C,eps):
     svList = []
     #find all the support vectors
     for sv in range(len(alfa)):
         if eps < alfa[sv] < C - eps:
             svList.append(sv)
-    """
-    for sv in svList:
-        #Compute b from complementary conditions
-        b = (1 / len(svList)) * (np.sum((y[sv] - np.dot((alfa * y).T, pol_ker(x1, x2[sv], gamma).reshape(-1, 1)))))
-    """
-    b = (1 / len(svList)) * (np.sum((y[sv] - np.dot((alfa * y).T, pol_ker(x1, x2[sv], gamma).reshape(-1, 1)) for sv in svList)))
+            
+    #b = (1 / len(svList)) * (np.sum((y[sv] - np.dot((alfa * y).T, pol_ker(x1, x2[sv], gamma).reshape(-1, 1)) for sv in svList)))
+    b = np.mean([y[sv] - np.sum(alfa * y * pol_ker(x1, x2[sv], gamma)) for sv in svList])
+
     
     #Compute prediction
     Ker = pol_ker(x1, x2, gamma)
     pred = np.sign(np.dot((alfa * y).T, Ker) + b)
 
     return pred
+"""
 
-
+def prediction(alfa,x1,x2,y,gamma,C,eps):
+    sv=0 #baseline
+    for i in range(len(alfa)):
+        if alfa[i]>=eps and alfa[i]<=C-eps:
+            sv=i
+            break
+    K=pol_ker(x1,x2,gamma)   
+    Kb=pol_ker(x1,x1[sv].reshape(1,x1.shape[1]),gamma)
+    pred=np.dot((alfa*y.reshape(-1,1)).T,K)+y[sv]-np.dot((alfa*y.reshape(-1,1)).T,Kb)
+    pred=np.sign(pred)
+    return pred
+"""
 def init_M(alfa, y_train, eps, C, Ker,P):
     Y = y_train*np.eye(P)
     Q = np.dot(np.dot(Y, Ker), Y)
@@ -152,13 +161,13 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,P,Ke
     fun_opt = (0.5 * (alfa_star.T @ Q_0 @ alfa_star) - np.sum(np.ones(P) * alfa_star))[0][0]
     
     pred_train = prediction(alfa_star,x_train,x_train,y_train,gamma,eps,C)
-    acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size()
+    acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size
 
     pred_test = prediction(alfa_star,x_train,x_test,y_train,gamma,eps,C)
-    acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size()
+    acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size
     
-    CM_train = confusion_matrix(y_train.ravel(), pred_train.ravel())
-    CM_test = confusion_matrix(y_test.ravel(), pred_test.ravel())
+    #CM_train = confusion_matrix(y_train.ravel(), pred_train.ravel())
+    #CM_test = confusion_matrix(y_test.ravel(), pred_test.ravel())
     
     M = init_M(alfa_star, y_train, eps, C, Kernel,P)
     m = init_m(alfa_star, y_train, eps, C, Kernel,P)
@@ -178,10 +187,10 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,P,Ke
     print("Optimal objective function value: ",fun_optimum)
     print("max KKT violation: ",M-m)
     
-    TrainCM=ConfusionMatrixDisplay(confusion_matrix=CM_train, display_labels=["T","F"]).plot()
-    TestCM=ConfusionMatrixDisplay(confusion_matrix=CM_test, display_labels=["T","F"]).plot()
-    TrainCM.show()
-    TestCM.show()
+    #TrainCM=ConfusionMatrixDisplay(confusion_matrix=CM_train, display_labels=["T","F"]).plot()
+    #TestCM=ConfusionMatrixDisplay(confusion_matrix=CM_test, display_labels=["T","F"]).plot()
+    #TrainCM.show()
+    #TestCM.show()
     
     return
 
@@ -210,10 +219,10 @@ def grid_search(x_train,y_train,eps, params): #avrei usato tutto il db x e y, ma
                 alfa_star = train(x_train_fold, y_train_fold, gamma, C)[0]
                 
                 pred_train = prediction(alfa_star,x_train_fold,x_train_fold,y_train_fold,gamma,C,eps) 
-                acc_train += np.sum(pred_train.ravel() == y_train_fold.ravel())/y_train_fold.size()
+                acc_train += np.sum(pred_train.ravel() == y_train_fold.ravel())/y_train_fold.size
 
                 pred_test = prediction(alfa_star,x_train_fold,x_test_fold,y_train_fold,gamma,C,eps) 
-                acc_test += np.sum(pred_test.ravel() == y_test_fold.ravel())/y_test_fold.size()
+                acc_test += np.sum(pred_test.ravel() == y_test_fold.ravel())/y_test_fold.size
             
             avg_acc_train = acc_train / kf.get_n_splits()
             avg_acc_test = acc_test / kf.get_n_splits()
