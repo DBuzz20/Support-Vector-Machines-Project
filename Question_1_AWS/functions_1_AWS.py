@@ -139,7 +139,7 @@ def main(x_train,x_test,y_train,y_test,gamma,C):
     h = matrix(np.concatenate((C*np.ones((P, 1)), np.zeros((P, 1))))) #termini noti
 
     #Equality constraints
-    A = matrix(y_train.T)#vincoli #trans
+    A = matrix(y_train.T)#vincoli #transposed
     b = matrix(np.array([0.])) #termini noti #np.zeros(1)
 
     start = time.time()
@@ -148,7 +148,7 @@ def main(x_train,x_test,y_train,y_test,gamma,C):
     
     alfa_star = np.array(opt['x'])
     n_it = opt["iterations"]
-    optimal_func_value = (0.5 * (alfa_star.T @ Q_0 @ alfa_star) - np.sum(np.ones(P) * alfa_star))[0][0]
+    fun_opt = (0.5 * (alfa_star.T @ Q_0 @ alfa_star) - np.sum(np.ones(P) * alfa_star))[0][0]
     
     pred_train = prediction(alfa_star,x_train,x_train,y_train,gamma,eps,C) 
     acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size 
@@ -159,5 +159,17 @@ def main(x_train,x_test,y_train,y_test,gamma,C):
     M = init_M(alfa_star, y_train, eps, C, Kernel)
     m = init_m(alfa_star, y_train, eps, C, Kernel) 
     
+    #printing routine
+    print("C value: ",C)
+    print("Gamma values: ",gamma)
+    
+    print("Accuracy on Training set: ",acc_train)
+    print("Accuracy on test set: ",acc_test)
+    
+    print("Time spent in optimization: ",run_time)
+    print("Number of iterations: ",n_it)
+    print("Starting objective function value: 0")
+    print("Optimal objective function value: ",fun_opt)
+    print("KKT violation: ",m-M)
     
     return
