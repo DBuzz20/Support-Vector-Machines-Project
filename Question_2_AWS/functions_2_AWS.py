@@ -248,7 +248,7 @@ def train(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
         
         not_w = np.delete(index_array, w)
         
-        Q_w,Q_notw = init_Q(buffer, w, not_w)
+        Q_workers,Q_w,Q_notw = init_Q(buffer, w, not_w)
         
         not_var = alfa[not_w]
         
@@ -266,7 +266,7 @@ def train(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
         alfa_star = np.array(opt['x'])
         cont += opt['iterations']
         
-        grad = grad + np.dot(Q[w].T, (alfa_star - alfa[w]))
+        grad = grad + np.dot(Q_workers.T, (alfa_star - alfa[w]))
         alfa[w] = alfa_star
         m, m_ind = init_m(alfa, y_train, eps, C,grad, K,q)
         M , M_ind = init_M(alfa, y_train, eps, C,grad, K,q)
