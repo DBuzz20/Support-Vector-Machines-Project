@@ -149,12 +149,12 @@ def train(x_train,y_train,gamma,C,P):
     run_time = time.time() - start
     
     alfa_star = np.array(opt['x']) 
-    print("EXITING TRAIN")
+    #print("EXITING TRAIN")
     return alfa_star,run_time,opt,Kernel,Q_0
     
 
 def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,P,Kernel,Q_0,alfa_star):
-    print(alfa_star)
+    #print(alfa_star)
     status= opt['status']
     fun_optimum=opt['primal objective']
     n_it = opt["iterations"]
