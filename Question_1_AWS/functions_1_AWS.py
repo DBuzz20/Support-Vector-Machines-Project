@@ -79,17 +79,18 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
         if eps < alfa[sv] < C - eps:
             svList.append(sv)
             
-    #b = (1 / len(svList)) * (np.sum((y[sv] - np.dot((alfa * y).T, pol_ker(x1, x2[sv], gamma).reshape(-1, 1)) for sv in svList)))
-    b = np.mean([y[sv] - np.sum(alfa * y * pol_ker(x1, x2[sv], gamma)) for sv in svList])
+    b = (1 / len(svList)) * (np.sum((y[sv] - np.dot((alfa * y).T, pol_ker(x1, x2[sv], gamma).reshape(-1, 1)) for sv in svList)))
+    #b = np.mean([y[sv] - np.sum(alfa * y * pol_ker(x1, x2[sv], gamma)) for sv in svList])
 
     
     #Compute prediction
     Ker = pol_ker(x1, x2, gamma)
+    alfa=alfa.reshape(-1)
     pred = np.sign(np.dot((alfa * y).T, Ker) + b)
 
     return pred
-"""
 
+"""
 def prediction(alfa,x1,x2,y,gamma,C,eps):
     sv=0 #baseline
     for i in range(len(alfa)):
@@ -102,6 +103,7 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
     pred=np.sign(pred)
     return pred
 """
+
 def init_M(alfa, y_train, eps, C, Ker,P):
     Y = y_train*np.eye(P)
     Q = np.dot(np.dot(Y, Ker), Y)
