@@ -80,9 +80,12 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
     for i in range(len(alfa)):
         if alfa[i]>=eps and alfa[i]<=C-eps:
             SV+=1
-            
-    Kb=pol_ker(x1,x1[SV].reshape(1,x1.shape[1]),gamma)
-    b=np.mean(y[SV] - ((alfa*y.reshape(-1,1)).T @ Kb))
+    if SV==0:
+        print("No SV found")
+        b=0
+    else:      
+        Kb=pol_ker(x1,x1[SV].reshape(1,x1.shape[1]),gamma)
+        b=np.mean(y[SV] - ((alfa*y.reshape(-1,1)).T @ Kb))
     
     K=pol_ker(x1,x2,gamma)
     pred=((alfa*y.reshape(-1,1)).T @ K ) + b
