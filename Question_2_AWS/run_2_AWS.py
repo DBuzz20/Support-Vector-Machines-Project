@@ -20,6 +20,8 @@ scaler = StandardScaler()
 x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 #---------------------------------------------------------------------------------------
-
+"""
 alfa,x_train,y_train,x_test,y_test,Y_train,K,M,m,run_time,status,fun_optimum,gamma,eps,C,q,cont=train(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol)
 printing_routine(alfa,x_train,y_train,x_test,y_test,Y_train,K,M,m,run_time,status,fun_optimum,gamma,eps,C,q,cont)
+"""
+grid_search(x_train, y_train, eps,gamma,C,tol,params)

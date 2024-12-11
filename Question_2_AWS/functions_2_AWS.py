@@ -316,15 +316,17 @@ params=np.arange(4,40,step=2)
 #params only contains q
 def grid_search(x_train, y_train, eps,gamma,C,tol,params):
     kf = KFold(n_splits=5,random_state=1895533, shuffle=True)
-    best_acc_valid = 0
-    acc_list = []
-    tot_iter = len(params)
-    num = 1
-    y_train=y_train.reshape(len(y_train),1)
+    
+    best_acc = -float("inf")
+    avg_acc_list = []
+    
+    #y_train=y_train.reshape(len(y_train),1)
     
     for q in params:
+        acc_train_tot=0
+        acc_test_tot=0
             
-        print ("iteration",num, "over", tot_iter )
+        print("Current hyperparameters => q: ",q)
 
         for train_index, val_index in kf.split(x_train):
             x_train_fold, x_test_fold = x_train[train_index], x_train[val_index]
@@ -360,36 +362,39 @@ def grid_search(x_train, y_train, eps,gamma,C,tol,params):
                 m, m_ind = init_m(alfa, y_train_fold, eps, C,grad, K,q)
                 M , M_ind = init_M(alfa, y_train_fold, eps, C,grad, K,q)
             """ 
+            pred_train = prediction(alfa,x_train_fold,x_train_fold,y_train_fold,gamma,C,eps) 
+            acc_train_tot += np.sum(pred_train.ravel() == y_train_fold.ravel())/y_train_fold.size
             pred_test = prediction(alfa,x_train_fold,x_test_fold,y_train_fold,gamma,eps,C) 
-            acc_test = np.sum(pred_test.ravel() == y_test_fold.ravel())/y_test_fold.size 
+            acc_test_tot += np.sum(pred_test.ravel() == y_test_fold.ravel())/y_test_fold.size 
             
-            print(acc_test)
-            acc_list.append(acc_test)
-            
-        num += 1
+        avg_acc_train = acc_train_tot / kf.get_n_splits()
+        avg_acc_test = acc_test_tot / kf.get_n_splits()
         
-        print(mean(acc_list), q)
-        if mean(acc_list) > best_acc_valid:
-            best_acc_valid = mean(acc_list)
-            best_q = q
-            acc_list = []
+        avg_acc_list.append([avg_acc_train, avg_acc_test])
+
+        if avg_acc_test > best_acc:
+            print("BETTER PARAMS FOUND:")
+            print("q = ",q)
+            best_acc = avg_acc_test
+            best_param = q
+            print(best_acc)
             
-    print("Best q: ", best_q)  
-    print("Best Median Accuracy: ", best_acc_valid)
+    print("List of average accuracy = ", avg_acc_list)        
+    print("Best q: ", best_param)  
+    print("Highest Accuracy: ", best_acc)
     
 
-"""
-def workers_selection(workers_list,X_train,X_test,y_train,gamma,epsilon,C,tol):
+
+def workers_selection(workers_list,x_train,x_test,y_train,gamma,epsilon,C,tol):
     mean_times = []
     for w in workers_list:
         times = []
         for i in range(10):
         
-            alfa,tim = training(X_train,X_test,y_train,gamma,epsilon,C,w,tol)
+            tim = train(x_train,x_test,y_train,gamma,epsilon,C,w,tol)[1]
             times.append(tim)
         
         mean_time =mean(times)
         mean_times.append(mean_time)
     
     print(mean_times)
-"""
