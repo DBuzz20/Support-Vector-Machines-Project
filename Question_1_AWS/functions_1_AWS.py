@@ -2,21 +2,16 @@ import os
 import gzip
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 from cvxopt import matrix, solvers
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
-from statistics import mean
-import time
-
-#solvers.options['abstol'] = 1e-15
-#solvers.options['reltol'] = 1e-15
-solvers.options['show_progress'] = False
 
 
 gamma=2
-C=10
-eps=1e-5
+C=1
+eps=1e-10
 
 def load_mnist(path, kind='train'):
 
@@ -70,10 +65,9 @@ def binary_class(y):
             y[i]=-1
     return y
             
-
 def pol_ker(x1, x2, gamma):
-    K=(x1 @ x2.T + 1) ** gamma
-    return K
+    k=(x1 @ x2.T +1)**gamma
+    return k
 
 def prediction(alfa,x1,x2,y,gamma,C,eps):
     SV=0 
@@ -90,66 +84,86 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
     K=pol_ker(x1,x2,gamma)
     pred=((alfa*y.reshape(-1,1)).T @ K ) + b
     pred=np.sign(pred)
+    print("number of SV:" ,SV)
 
     return pred
 
-def get_M(alfa, y, epsilon, C, K):
+"""
+def prediction(alfa,x1,x2,y,gamma,C,eps):
+    K=pol_ker(x1,x2,gamma)
+    sv=0 #baseline
+    for i in range(len(alfa)):
+        if alfa[i]>=eps and alfa[i]<=C-eps:
+            sv=i
+            break
+            
+    Kb=pol_ker(x1,x1[sv].reshape(1,x1.shape[1]),gamma)
+    b= y[sv]-((alfa*y.reshape(-1,1)).T @ Kb)
+    pred=((alfa*y.reshape(-1,1)).T @ K) + b
+    pred=np.sign(pred)
+    return pred
+"""
+
+def get_M(alfa, y, eps, C, K):
     Y = np.eye(len(y))*y
     Q = (Y @ K)@ Y
     M_grad = -(Q @ alfa - 1) * y
-    S = np.where(
-        np.logical_or(
-            np.logical_and(alfa <= C-epsilon, y==-1), np.logical_and(alfa >= epsilon ,y == 1)))#[0]
+    #S = np.where(np.logical_or(np.logical_and(alfa <= C-epsilon, y==-1), np.logical_and(alfa >= epsilon ,y == 1)))
+    S = np.union1d(np.where((alfa <= C-eps) & (y<0))[0], np.where((alfa >= eps) & (y >0))[0])
     M = np.min(M_grad[S])
-    
-         
+        
     return M
 
-def get_m(alfa, y, epsilon, C, K):
+def get_m(alfa, y, eps, C, K):
     Y = np.eye(len(y))*y
-    Q = (Y @ K)@ Y
-    m_grad = -((Q @ alfa) - 1) * y
-    R = np.where(
-        np.logical_or(
-            np.logical_and(alfa <= C-epsilon, y==1), np.logical_and(alfa >= epsilon ,y == -1)))#[0]
+    Q = (Y @ K) @Y
+    m_grad = -(Q @ alfa - 1) * y
+    #R = np.where(np.logical_or(np.logical_and(alfa <= C-epsilon, y==1), np.logical_and(alfa >= epsilon ,y == -1)))
+    R = np.union1d(np.where((alfa <= C-eps) & (y>0))[0], np.where((alfa >= eps) & (y <0))[0])
     m = np.max(m_grad[R])
     
     return m
 
             
-
 def train(x_train,y_train,gamma,C):
-    P = y_train.shape[0]
-    K = pol_ker(x_train,x_train,gamma)
-    Y_train = y_train * np.eye(P)
-    Q_0 = (Y_train @ K) @ Y_train
+    solvers.options['abstol'] = 1e-15
+    solvers.options['reltol'] = 1e-15
+    solvers.options['feastol']= 1e-15
+    solvers.options['show_progress'] = False
+    
+    k=pol_ker(x_train,x_train,gamma)
+    Y_train=np.diag(y_train)
+    P=Y_train.shape[0]
+    y_train=y_train.reshape(len(y_train),1)
+    
     #Matrix definition to solve the QP
     #Objective Function
-    Q = matrix(Q_0)
-    e = matrix((-np.ones(P)).reshape(-1, 1))
-
-    #Inequality constraints ( Gx <= h )
-    G = matrix(np.concatenate((np.eye(P), -np.eye(P)))) #vincoli
-    h = matrix(np.concatenate((np.ones((P, 1)) * C, np.zeros((P, 1))))) #termini noti
-
-    #Equality constraints ( A x = b )
-    A = matrix(y_train.reshape(1, -1))#vincoli #transposed
-    b = matrix(np.array([0.])) #termini noti #np.zeros(1)
+    Q = matrix((Y_train @ k) @ Y_train)
+    e = matrix(-np.ones(P))
     
-    # Training
+    #Inequality constraints ( Gx <= h )
+    G = matrix(np.concatenate(((np.eye(P)), -np.eye(P)))) #vincoli
+    h = matrix(np.concatenate((C*np.ones((P,1)), np.zeros((P,1))))) #termini noti
+    
+    #Equality constraints ( A x = b )
+    A = matrix(y_train.T) #vincoli
+    b = matrix(0, tc = 'd') #termini noti
+    
     start = time.time()
     opt = solvers.qp(Q,e, G, h, A, b)
-    run_time = time.time() -start
+    run_time = time.time() - start
     
     alfa_star = np.array(opt['x'])
     
-    return alfa_star,run_time,opt,K,Q_0
-    
-    
-def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,K,alfa_star):
+    return alfa_star,run_time,opt,k
+
+  
+def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,kernel,alfa_star):
     status= opt['status']
     fun_optimum=opt['primal objective']
     n_it = opt["iterations"]
+    
+    y_train=y_train.reshape(len(y_train),1)  
     
     pred_train = prediction(alfa_star,x_train,x_train,y_train,gamma,C,eps) 
     acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size 
@@ -157,8 +171,8 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,K,al
     pred_test = prediction(alfa_star,x_train,x_test,y_train,gamma,C,eps) 
     acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size 
     
-    M = get_M(alfa_star, y_train, eps, C, K)
-    m = get_m(alfa_star, y_train, eps, C, K)
+    M = get_M(alfa_star, y_train, eps, C, kernel)
+    m = get_m(alfa_star, y_train, eps, C, kernel)
     
     #printing routine
     print("C value: ",C)
@@ -169,22 +183,24 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,K,al
     print()
     print("Time spent in optimization: ",run_time)
     print("Solver status: ",status)
-    print("Number of iterations: ",n_it)  
+    print("Number of iterations: ",n_it)
     print("Optimal objective function value: ",fun_optimum)
-    print("max KKT violation: ",M-m)
+    print("max KKT violation: ",m-M)
     
     cm = confusion_matrix(y_test.ravel(), pred_test.flatten())
     
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[True,False])
     disp.plot()
     plt.show()
+    
+
 
 #parametri tipo [C,gamma]-----------------------------------------------------------
 params=[np.array([1,2,3,4,5,10,15,20,25,50,100]),np.arange(2,10,step=1)]
 
 params_C=[np.array([1,2,3,4,5,10,15,20,25,30,40,50,60,75,90,100]),np.array([2])]
 
-params_gamma=[np.array([]),np.arange(2,20,step=1)]
+#params_gamma=[np.array([]),np.arange(2,20,step=1)]
 #-----------------------------------------------------------------------------------
     
 def grid_search(x_train,y_train,eps, params): #avrei usato tutto il db x e y, ma uso x/y_train perche sono gia scalati
