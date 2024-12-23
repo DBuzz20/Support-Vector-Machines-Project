@@ -9,10 +9,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
 
 
-gamma=2
-C=1
-eps=1e-5
-
 def load_mnist(path, kind='train'):
 
     """Load MNIST data from `path`"""
@@ -91,8 +87,14 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
 def get_M(alfa, y, eps, C,grad, q):
     grad = grad.reshape((len(alfa), 1))
     S = np.union1d(np.where((alfa <= C-eps) & (y<0))[0], np.where((alfa >= eps) & (y >0))[0])
+    print(len(alfa))
+    print(len(grad))
+    print(len(S))
+    print(len(y))
+    S = S[S < len(grad)]
     M_grad=-grad[S]* y[S]
-    M = np.min(M_grad[S])
+    print(len(M_grad))
+    M = np.min(M_grad)
     
     q2=np.argsort(M_grad.ravel())[0:int(q/2)]
     
@@ -103,7 +105,7 @@ def get_M(alfa, y, eps, C,grad, q):
 def get_m(alfa, y, eps, C,grad, q):
     grad = grad.reshape((len(alfa), 1))
     R = np.union1d(np.where((alfa <= C-eps) & (y>0))[0], np.where((alfa >= eps) & (y <0))[0])
-    
+    R = R[R < len(grad)]
     m_grad = -grad[R] * y[R]
     m = np.max(m_grad)
     
@@ -112,3 +114,124 @@ def get_m(alfa, y, eps, C,grad, q):
     q1_ind=np.array(R, dtype = int)[q1]
     
     return m,q1_ind
+
+def init_Q(buff, work, not_w):
+    Q_work=[]
+    for i in work:
+        Q_work.append(buff['{}'.format(i)])
+    
+    
+    Q_work=np.array(Q_work)
+    
+    index=np.arange(Q_work.shape[0])
+    Q_w = Q_work[np.ix_(index, work)]
+    
+    
+    Q_notw = Q_work[np.ix_(index, not_w)]
+  
+    return Q_work,Q_w, Q_notw
+
+def train(X_train,y_train,gamma,epsilon,C,q,tol):
+    index_array = np.arange(X_train.shape[0])
+    y_train=y_train.reshape(len(y_train),1)
+    K=pol_ker(X_train,X_train,gamma)
+    Y_train=y_train*np.eye(len(y_train))
+    
+    
+    alfa=np.zeros((X_train.shape[0], 1))
+    grad = -np.ones((len(alfa), 1))
+    
+    
+    
+    
+    m, m_ind = get_m(alfa, y_train, epsilon, C,grad,q)
+    M , M_ind = get_M(alfa, y_train, epsilon, C,grad,q)
+    buffer={}
+    
+    start=time.time()
+    cont = 0
+    while (m - M) >= tol:
+        
+        w = np.sort(np.concatenate((m_ind, M_ind)))
+        
+        for i in w:
+            if i not in buffer.keys():
+                Ke=pol_ker(X_train[i],X_train,gamma)
+                colonna=y_train[i]*np.dot(Ke,Y_train)#calcolo colonna
+            
+                buffer['{}'.format(i)]=colonna
+        
+        not_w = np.delete(index_array, w)
+        
+        Q_workers,Q_w,Q_notw = init_Q(buffer, w, not_w)
+        
+        not_var = alfa[not_w]
+        
+        
+        P=matrix(Q_w)
+        
+        
+    
+        e=matrix(np.dot(Q_notw, not_var)- np.ones((len(w),1)))
+        A=matrix(y_train[w].T)
+        b=matrix(-np.dot(y_train[not_w].T, not_var))
+        G=matrix(np.concatenate((np.eye(len(w)),-np.eye(len(w)))))
+        h=matrix(np.concatenate((C*np.ones((len(w),1)),np.zeros((len(w),1)))))
+    
+    
+    
+        sol = solvers.qp(P,e, G, h, A, b)
+    
+    
+        alfa_star = np.array(sol['x'])
+        cont += sol['iterations']
+        
+        grad = grad + np.dot(Q_workers.T, (alfa_star - alfa[w]))
+        alfa[w] = alfa_star
+        m, m_ind = get_m(alfa, y_train, epsilon, C,grad,q)
+        M , M_ind = get_M(alfa, y_train, epsilon, C,grad,q)
+    end = time.time()
+    run_time= end - start
+    
+    return alfa, run_time, M, m, cont
+
+def printing_routine(X_train,X_test,y_train,y_test,gamma,epsilon,C,q,alfa,run_time,M, m):
+    y_train=y_train.reshape(len(y_train),1)
+    K=pol_ker(X_train,X_train,gamma)
+    Y_train=y_train*np.eye(len(y_train))
+    
+    #we have calculated the entire Q only to compute the FOB as requested in the instructions
+    Q=np.dot(np.dot(Y_train,K),Y_train)
+    FOB=1/2*(np.dot(np.dot(alfa.T,Q),alfa))-np.dot(np.ones((1,len(alfa))),alfa)
+    
+    
+    pred_train = prediction(alfa,X_train,X_train,y_train,gamma,epsilon,C) 
+    acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size 
+
+    pred_test = prediction(alfa,X_train,X_test,y_train,gamma,epsilon,C) 
+    acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size 
+    
+    #print(len(buffer))
+    print('Test Accuracy:' ,acc_test)
+    print('Training Accuracy:', acc_train)
+    
+    print('Initial value of the objective function :',0)
+    print('Final value of the objective function:', FOB)
+    print('Value chosen for C:' ,C)
+    print('Value chosen for gamma:' ,gamma)
+    print('Time to optimize:', run_time)
+    print('Number of workers chosen:', q)
+    print('Number of iterations', cont)
+    print('KKT Violation:', M-m)
+    
+    
+    print('\n')
+    
+    cm = confusion_matrix(y_test.ravel(), pred_test.ravel()) 
+    
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[1,5])
+    disp.plot()
+    plt.show()
+    
+    return
+    
