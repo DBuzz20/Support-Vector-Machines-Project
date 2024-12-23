@@ -87,13 +87,13 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
 def get_M(alfa, y, eps, C,grad, q):
     grad = grad.reshape((len(alfa), 1))
     S = np.union1d(np.where((alfa <= C-eps) & (y<0))[0], np.where((alfa >= eps) & (y >0))[0])
-    print(len(alfa))
-    print(len(grad))
-    print(len(S))
-    print(len(y))
+    #print(len(alfa))
+    #print(len(grad))
+    #print(len(S))
+    #print(len(y))
     S = S[S < len(grad)]
     M_grad=-grad[S]* y[S]
-    print(len(M_grad))
+    #print(len(M_grad))
     M = np.min(M_grad)
     
     q2=np.argsort(M_grad.ravel())[0:int(q/2)]
@@ -120,7 +120,6 @@ def init_Q(buff, work, not_w):
     for i in work:
         Q_work.append(buff['{}'.format(i)])
     
-    
     Q_work=np.array(Q_work)
     
     index=np.arange(Q_work.shape[0])
@@ -132,17 +131,18 @@ def init_Q(buff, work, not_w):
     return Q_work,Q_w, Q_notw
 
 def train(X_train,y_train,gamma,epsilon,C,q,tol):
+    solvers.options['abstol'] = 1e-15
+    solvers.options['reltol'] = 1e-15
+    solvers.options['feastol']= 1e-15
+    solvers.options['show_progress'] = False
+    
     index_array = np.arange(X_train.shape[0])
     y_train=y_train.reshape(len(y_train),1)
     K=pol_ker(X_train,X_train,gamma)
     Y_train=y_train*np.eye(len(y_train))
     
-    
     alfa=np.zeros((X_train.shape[0], 1))
     grad = -np.ones((len(alfa), 1))
-    
-    
-    
     
     m, m_ind = get_m(alfa, y_train, epsilon, C,grad,q)
     M , M_ind = get_M(alfa, y_train, epsilon, C,grad,q)
@@ -190,14 +190,14 @@ def train(X_train,y_train,gamma,epsilon,C,q,tol):
         alfa[w] = alfa_star
         m, m_ind = get_m(alfa, y_train, epsilon, C,grad,q)
         M , M_ind = get_M(alfa, y_train, epsilon, C,grad,q)
+        
     end = time.time()
     run_time= end - start
     
-    return alfa, run_time, M, m, cont
+    return alfa, run_time, M, m, cont,K
 
-def printing_routine(X_train,X_test,y_train,y_test,gamma,epsilon,C,q,alfa,run_time,M, m):
+def printing_routine(X_train,X_test,y_train,y_test,gamma,epsilon,C,q,alfa,run_time,M, m,cont,K):
     y_train=y_train.reshape(len(y_train),1)
-    K=pol_ker(X_train,X_train,gamma)
     Y_train=y_train*np.eye(len(y_train))
     
     #we have calculated the entire Q only to compute the FOB as requested in the instructions
