@@ -84,25 +84,9 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
     K=pol_ker(x1,x2,gamma)
     pred=((alfa*y.reshape(-1,1)).T @ K ) + b
     pred=np.sign(pred)
-    print("number of SV:" ,SV)
+    #print("number of SV:" ,SV)
 
     return pred
-
-"""
-def prediction(alfa,x1,x2,y,gamma,C,eps):
-    K=pol_ker(x1,x2,gamma)
-    sv=0 #baseline
-    for i in range(len(alfa)):
-        if alfa[i]>=eps and alfa[i]<=C-eps:
-            sv=i
-            break
-            
-    Kb=pol_ker(x1,x1[sv].reshape(1,x1.shape[1]),gamma)
-    b= y[sv]-((alfa*y.reshape(-1,1)).T @ Kb)
-    pred=((alfa*y.reshape(-1,1)).T @ K) + b
-    pred=np.sign(pred)
-    return pred
-"""
 
 def get_M(alfa, y, eps, C, K):
     Y = np.eye(len(y))*y
