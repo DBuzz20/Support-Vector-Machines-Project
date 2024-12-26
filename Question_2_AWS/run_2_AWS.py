@@ -13,9 +13,9 @@ y_train=binary_class(y_train)
 y_test=binary_class(y_test)
 
 #normalization
-scaler = StandardScaler()
+scaler = MinMaxScaler()
 x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 #---------------------------------------------------------------------------------------
 
-training_buffer(x_train,x_test,y_train,gamma,eps,C,q,tol)
+training_buffer(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol)

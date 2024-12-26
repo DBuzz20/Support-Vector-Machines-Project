@@ -75,14 +75,8 @@ def binary_class(y):
             y[i]=-1
     return y
 
-def normalization(x_train,x_test): 
-    norm = MinMaxScaler()
-    x_train = norm.fit_transform(x_train)
-    x_test = norm.transform(x_test)
-    return x_train,x_test
-
 def pol_ker(x1, x2, gamma):
-    k=(x1@x2.T+1)**gamma
+    k=(x1 @ x2.T +1)**gamma
     return k
 
 def prediction(alfa,x1,x2,y,gamma,C,eps):
@@ -146,19 +140,14 @@ def init_Q(buffer, workers, not_workers):
 
 
 
-def training_buffer(x_train,x_test,y_train,gamma,eps,C,q,tol):
-    x_train,x_test=normalization(x_train,x_test)
+def training_buffer(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
     index_array = np.arange(x_train.shape[0])
     y_train=y_train.reshape(len(y_train),1)
     K=pol_ker(x_train,x_train,gamma)
     Y_train=y_train*np.eye(len(y_train))
     
-    
     alfa=np.zeros((x_train.shape[0], 1))
     grad = -np.ones((len(alfa), 1))
-    
-    
-    
     
     m, m_i = get_m(alfa, y_train, eps, C,grad, K,q)
     M , M_i = get_M(alfa, y_train, eps, C,grad, K,q)
@@ -455,16 +444,6 @@ def training_Q(x_train,x_test,y_train,gamma,epsilon,C,q,tol):
     
     return alfa,end-start
 """
-
-        
-x_train, x_test, y_train, y_test  = train_test_split(x_data, y_data, test_size = 0.2, random_state = 1895533)
-
-y_train=binary_class(y_train)
-y_test=binary_class(y_test)
-"""
-scaler = StandardScaler()
-x_train = scaler.fit_transform(x_train)
-x_test = scaler.transform(x_test)"""
 
 
 
