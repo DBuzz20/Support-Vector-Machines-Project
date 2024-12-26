@@ -70,7 +70,7 @@ def binary_class(y):
 
 
 def pol_ker(x1, x2, gamma):
-    k=(np.dot(x1,x2.T)+1)**gamma
+    k=(x1@x2.T+1)**gamma
     return k
 
 
@@ -91,12 +91,13 @@ def prediction(alfa,x1,x2,y,gamma,eps,C):
         
     pred=((alfa*y.reshape(-1,1)).T @ K) + b
     pred=np.sign(pred)
+    
     return pred
 
 
 def get_M(alfa, y, eps, C,grad,q):
     grad = grad.reshape((len(alfa), 1))
-    S = np.where(np.logical_or(np.logical_and(alfa <= C-eps, y==-1), np.logical_and(alfa >= eps ,y == 1)))[0]
+    S = np.union1d(np.where((alfa <= C-eps) & (y<0))[0], np.where((alfa >= eps) & (y >0))[0])
     M_grad=-grad[S] * y[S]
     M = np.min(M_grad)
     
@@ -107,7 +108,7 @@ def get_M(alfa, y, eps, C,grad,q):
 
 def get_m(alfa, y, eps, C,grad,q):
     grad = grad.reshape((len(alfa), 1))
-    R = np.where(np.logical_or(np.logical_and(alfa <= C-eps, y==1), np.logical_and(alfa >= eps ,y == -1)))[0]
+    R = np.union1d(np.where((alfa <= C-eps) & (y>0))[0], np.where((alfa >= eps) & (y <0))[0])
     m_grad = -grad[R] * y[R]
     m = np.max(m_grad)
     

@@ -18,4 +18,5 @@ x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 #---------------------------------------------------------------------------------------
 
-training_buffer(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol)
+alfa,run_time, acc_test,acc_train, FO,cont,M,m,pred_test,pred_train= training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol)
+printing_routine(M,m,run_time , acc_test,acc_train, FO,cont,pred_test,pred_train)
