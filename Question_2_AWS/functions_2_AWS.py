@@ -80,6 +80,7 @@ def pol_ker(x1, x2, gamma):
     return k
 
 def prediction(alfa,x1,x2,y,gamma,C,eps):
+    K=pol_ker(x1,x2,gamma)
     SV=0 
     for i in range(len(alfa)):
         if alfa[i]>=eps and alfa[i]<=C-eps:
@@ -91,7 +92,6 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
         Kb=pol_ker(x1,x1[SV].reshape(1,x1.shape[1]),gamma)
         b=np.mean(y[SV] - ((alfa*y.reshape(-1,1)).T @ Kb))
     
-    K=pol_ker(x1,x2,gamma)
     pred=((alfa*y.reshape(-1,1)).T @ K ) + b
     pred=np.sign(pred)
 
@@ -140,7 +140,7 @@ def init_Q(buffer, workers, not_workers):
 
 
 
-def training_buffer(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
+def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
     index_array = np.arange(x_train.shape[0])
     y_train=y_train.reshape(len(y_train),1)
     K=pol_ker(x_train,x_train,gamma)
@@ -154,7 +154,7 @@ def training_buffer(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
     buffer={}
     
     start=time.time()
-    cont = 0
+    n_it = 0
     while (m - M) >= tol:
         
         w = np.sort(np.concatenate((m_i, M_i)))
@@ -189,7 +189,7 @@ def training_buffer(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
     
     
         alfa_star = np.array(sol['x'])
-        cont += sol['iterations']
+        n_it += sol['iterations']
         
         grad = grad + Q_workers.T@ (alfa_star - alfa[w])
         alfa[w] = alfa_star
@@ -208,34 +208,32 @@ def training_buffer(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
 
     pred_test = prediction(alfa,x_train,x_test,y_train,gamma,eps,C) 
     acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size 
-    
+    run_time= end-start
     #print(len(buffer))
-    print('Test Accuracy:' ,acc_test)
-    print('Training Accuracy:', acc_train)
-    
-    print('Initial value of the objective function :',0)
-    print('Final value of the objective function:', FO)
-    print('Value chosen for C:' ,C)
-    print('Value chosen for gamma:' ,gamma)
-    print('Time to optimize:', end-start)
-    print('Number of workers chosen:', q)
-    print('Number of iterations', cont)
-    print('KKT Violation:', M-m)
     
     
-    print('\n')
+    return alfa,run_time, acc_test,acc_train, FO,n_it,M,m,pred_test,pred_train
+
+
+def printing_routine(M,m,run_time, acc_test,acc_train, FO,n_it,pred_test,pred_train):
+    print("C value: ",C)
+    print("Gamma values: ",gamma)
+    print("q value:",q)
+    print()
+    print("Accuracy on Training set: %.3f" %acc_train)
+    print("Accuracy on test set: %.3f" %acc_test)
+    print()
+    print("Time spent in optimization: ",run_time)
+    print("Number of iterations: ",n_it)
+    print("Optimal objective function value: ",FO)
+    print('max KKT Violation:', M-m)
+    
     
     cm = confusion_matrix(y_test.ravel(), pred_test.ravel()) 
     
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[1,5])
     disp.plot()
-    plt.show()
-    
-    
-    return alfa,end-start
-
-
-        
+    plt.show() 
   
 
 def cross_val(q_list, x_train, x_test, y_train, y_test, eps,gamma,C,tol):
@@ -444,6 +442,9 @@ def training_Q(x_train,x_test,y_train,gamma,epsilon,C,q,tol):
     
     return alfa,end-start
 """
+x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size = 0.2, random_state = 1895533)
 
+y_train=binary_class(y_train)
+y_test=binary_class(y_test)
 
 
