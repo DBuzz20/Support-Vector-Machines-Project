@@ -181,10 +181,12 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,kern
 
 #parametri tipo [C,gamma]-----------------------------------------------------------
 params=[np.array([1,2,3,4,5,10,15,20,25,50,100]),np.arange(2,8,step=1)]
+""" [1, 2]
+0.99375 """
 
 params_C=[np.array([1,2,3,4,5,10,15,20,25,30,40,50,60,75,90,100]),np.array([2])]
 
-#params_gamma=[np.array([]),np.arange(2,20,step=1)]
+params_gamma=[np.array([]),np.arange(2,20,step=1)]
 #-----------------------------------------------------------------------------------
     
 def grid_search(x_train,y_train,eps, params): #avrei usato tutto il db x e y, ma uso x/y_train perche sono gia scalati

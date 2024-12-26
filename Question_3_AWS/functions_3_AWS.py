@@ -81,9 +81,7 @@ def prediction(alfa,x1,x2,y,gamma,eps,C):
         if alfa[i]>=eps and alfa[i]<=C-eps:
             sv+=1
     if sv==0:
-        print("\n")
         print("no SV found")
-        print("\n")
         b=0
     else:
         Kb=pol_ker(x1,x1[sv].reshape(1,x1.shape[1]),gamma)
