@@ -11,7 +11,7 @@ from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
 
 gamma=2
 C=1
-eps=1e-5
+eps=1e-8
 
 def load_mnist(path, kind='train'):
 
@@ -180,7 +180,7 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,kern
 
 
 #parametri tipo [C,gamma]-----------------------------------------------------------
-params=[np.array([1,2,3,4,5,10,15,20,25,50,100]),np.arange(2,10,step=1)]
+params=[np.array([1,2,3,4,5,10,15,20,25,50,100]),np.arange(2,8,step=1)]
 
 params_C=[np.array([1,2,3,4,5,10,15,20,25,30,40,50,60,75,90,100]),np.array([2])]
 
@@ -216,6 +216,8 @@ def grid_search(x_train,y_train,eps, params): #avrei usato tutto il db x e y, ma
             avg_acc_test = acc_test_tot / kf.get_n_splits()
             
             avg_acc_list.append([avg_acc_train, avg_acc_test])
+            print(avg_acc_train)
+            print(avg_acc_test)
             
             if avg_acc_test > best_acc:
                 print("BETTER PARAMS FOUND:")
