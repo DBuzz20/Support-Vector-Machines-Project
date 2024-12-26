@@ -85,21 +85,22 @@ def pol_ker(x1, x2, gamma):
     k=(x1@x2.T+1)**gamma
     return k
 
-def prediction(alfa,x1,x2,y,gamma,eps,C):
-    x1,x2=normalization(x1,x2)
-    K=pol_ker(x1,x2,gamma)
-    sv=0
+def prediction(alfa,x1,x2,y,gamma,C,eps):
+    SV=0 
     for i in range(len(alfa)):
         if alfa[i]>=eps and alfa[i]<=C-eps:
-            sv=i
-            break
-    if sv==0:
-        print("no sv found")
-    else:
-        Kb=pol_ker(x1,x1[sv].reshape(1,x1.shape[1]),gamma)
-    pred=((alfa*y.reshape(-1,1)).T @ K)+(y[sv]-(alfa*y.reshape(-1,1)).T @Kb)
+            SV+=1
+    if SV==0:
+        print("No SV found")
+        b=0
+    else:      
+        Kb=pol_ker(x1,x1[SV].reshape(1,x1.shape[1]),gamma)
+        b=np.mean(y[SV] - ((alfa*y.reshape(-1,1)).T @ Kb))
+    
+    K=pol_ker(x1,x2,gamma)
+    pred=((alfa*y.reshape(-1,1)).T @ K ) + b
     pred=np.sign(pred)
-    #la b non dovrebbe essere della media? non capisco nemmeno il breazk nel ciclo for
+
     return pred
 
 
@@ -337,7 +338,7 @@ def cross_val(q_list, x_train, x_test, y_train, y_test, eps,gamma,C,tol):
     print("Best Median Accuracy: ", best_acc_valid)
 
 
-def workers_selection(workers_list,X_train,X_test,y_train,gamma,epsilon,C,tol):
+def workers_selection(workers_list,x_train,x_test,y_train,gamma,epsilon,C,tol):
     
     mean_times = []
 
@@ -347,7 +348,7 @@ def workers_selection(workers_list,X_train,X_test,y_train,gamma,epsilon,C,tol):
     
         for i in range(10):
         
-            alfa,tim = training(X_train,X_test,y_train,gamma,epsilon,C,w,tol)
+            alfa,tim = training_buffer(x_train,x_test,y_train,gamma,epsilon,C,w,tol)
             times.append(tim)
         
         mean_time =mean(times)
