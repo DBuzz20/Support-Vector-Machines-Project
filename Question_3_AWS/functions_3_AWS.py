@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 import time
 from cvxopt import matrix, solvers
 from sklearn.model_selection import train_test_split, KFold
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler,MinMaxScaler
 from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
 
 gamma=2
 C=1
-eps=1e-5
-tol=1e-12
+eps=1e-8
+tol=1e-11
 q=2
 
 def load_mnist(path, kind='train'):
@@ -74,7 +74,7 @@ def pol_ker(x1, x2, gamma):
     return k
 
 
-def prediction(alfa,x1,x2,y,gamma,eps,C):
+def prediction(alfa,x1,x2,y,gamma,C,eps):
     K=pol_ker(x1,x2,gamma)
     sv=0
     for i in range(len(alfa)):
@@ -187,6 +187,9 @@ def train(x_train,y_train,gamma,eps,C,q,tol):
         M , j = get_M(alfa, y_train, eps, C,grad,q)
         
         n_it += 1
+        
+        #print(m)
+        #print(M)
            
     run_time= time.time() - start
     
@@ -200,10 +203,10 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,eps,C,q,alfa,run_time,n
     y_train=y_train.reshape(P,1)
     Y_train=y_train*np.eye(P)
     
-    pred_train = prediction(alfa,x_train,x_train,y_train,gamma,eps,C) 
+    pred_train = prediction(alfa,x_train,x_train,y_train,gamma,C,eps) 
     acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size 
 
-    pred_test = prediction(alfa,x_train,x_test,y_train,gamma,eps,C) 
+    pred_test = prediction(alfa,x_train,x_test,y_train,gamma,C,eps) 
     acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size
     
     Q=Y_train @ K @ Y_train #needed for opt_obj_fun

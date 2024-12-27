@@ -1,5 +1,3 @@
-
-
 import os
 import gzip
 import numpy as np
@@ -9,16 +7,12 @@ from cvxopt import matrix, solvers
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
-from statistics import mean
-solvers.options['abstol'] = 1e-15
-solvers.options['reltol'] = 1e-15
-solvers.options['show_progress'] = False
 
 
 gamma=2
 C=1
-eps=1e-5
-tol=1e-12
+eps=1e-8
+tol=1e-11
 q=80
 
 def load_mnist(path, kind='train'):
@@ -64,7 +58,6 @@ yLabel7 = y_all_labels[indexLabel7][:1000].astype('float64')
 
 x_data=np.concatenate((xLabel1,xLabel5))
 y_data=np.concatenate((yLabel1,yLabel5))
-
 
 
 def binary_class(y):
@@ -124,18 +117,20 @@ def get_Q(buffer, workers, not_workers):
     Q_workers=[]
     for i in workers:
         Q_workers.append(buffer['{}'.format(i)])
-    
+        
     Q_workers=np.array(Q_workers)
-    
     index=np.arange(Q_workers.shape[0])
     Q_w = Q_workers[np.ix_(index, workers)]
-    
     Q_notw = Q_workers[np.ix_(index, not_workers)]
-  
     return Q_workers,Q_w, Q_notw
 
 
 def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
+    solvers.options['abstol'] = 1e-15
+    solvers.options['reltol'] = 1e-15
+    solvers.options['feastol'] = 1e-15
+    solvers.options['show_progress'] = False
+    
     index_array = np.arange(x_train.shape[0])
     y_train=y_train.reshape(len(y_train),1)
     K=pol_ker(x_train,x_train,gamma)
@@ -182,24 +177,26 @@ def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
         n_it += opt['iterations']
         
         diff = alfa_star - alfa[w]
-        grad = grad + Q_workers.T @ (diff)
+        grad = grad + (Q_workers.T @ diff)
         alfa[w] = alfa_star
         
         m, m_i = get_m(alfa, y_train, eps, C,grad,q)
         M , M_i = get_M(alfa, y_train, eps, C,grad,q)
+        #print(m)
+        #print(M)
         
     run_time = time.time() - start
     
     status= opt['status']
 
-    #we have calculated the entire Q only to compute the FOB as requested in the instructions
+    #we have calculated the entire Q only to compute the obj_fun_val
     Q=((Y_train@K)@Y_train)
-    obj_fun_val=1/2*(((alfa.T@Q)@alfa))-(np.ones((1,len(alfa)))@alfa)[0][0]
+    obj_fun_val=1/2*((alfa.T@Q@alfa))-(np.ones((1,len(alfa)))@alfa)[0][0]
 
-    pred_train = prediction(alfa,x_train,x_train,y_train,gamma,eps,C) 
+    pred_train = prediction(alfa,x_train,x_train,y_train,gamma,C,eps) 
     acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size 
 
-    pred_test = prediction(alfa,x_train,x_test,y_train,gamma,eps,C) 
+    pred_test = prediction(alfa,x_train,x_test,y_train,gamma,C,eps) 
     acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size
     
     return alfa,run_time, acc_test,acc_train, obj_fun_val,n_it,M,m,pred_test,status
@@ -221,21 +218,24 @@ def printing_routine(y_test,M,m,run_time, acc_test,acc_train, obj_fun_val,n_it,p
     
     cm = confusion_matrix(y_test.ravel(), pred_test.ravel()) 
     
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[1,5])
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[True,False])
     disp.plot()
     plt.show() 
   
 
-def cross_val(q_list, x_train, y_train, eps,gamma,C,tol):
+#parametri tipo [q]-----------------------------------------------------------
+params=[np.arange(4,150,step=5)]
+
+def optimum_q(params, x_train, y_train, eps,gamma,C,tol):
     
     kf = KFold(n_splits=5)
     best_acc_valid = 0
     acc_list = []
-    tot_iter = len(q_list)
+    tot_iter = len(params)
     num = 1
     y_train=y_train.reshape(len(y_train),1)
     
-    for q in q_list:
+    for q in params:
             
         print ("iteration",num, "over", tot_iter )
 
@@ -285,16 +285,16 @@ def cross_val(q_list, x_train, y_train, eps,gamma,C,tol):
                 alfa[w] = alfa_star
                 m, m_ind = get_m(alfa, y_train_cv, eps, C,grad, q)
                 M , M_ind = get_M(alfa, y_train_cv, eps, C,grad, q)
-            prediction_valid = prediction(alfa,x_train_cv,x_valid,y_train_cv,gamma,eps,C) 
+            prediction_valid = prediction(alfa,x_train_cv,x_valid,y_train_cv,gamma,C,eps) 
             Accuracy_validation = np.sum(prediction_valid.ravel() == y_valid.ravel())/y_valid.size 
             print(Accuracy_validation)
             acc_list.append(Accuracy_validation)
             
         num += 1
         
-        print(mean(acc_list), q)
-        if mean(acc_list) > best_acc_valid:
-            best_acc_valid = mean(acc_list)
+        print(np.mean(acc_list), q)
+        if np.mean(acc_list) > best_acc_valid:
+            best_acc_valid = np.mean(acc_list)
             best_q = q
 
 
