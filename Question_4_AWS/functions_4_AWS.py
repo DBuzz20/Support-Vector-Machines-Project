@@ -8,11 +8,16 @@ from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
 from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay,accuracy_score
 
+solvers.options['abstol'] = 1e-15
+solvers.options['reltol'] = 1e-15
+solvers.options['show_progress'] = False
 
 gamma=2
 C=1
-eps=1e-10
-epsB=1e-5
+eps=1e-5
+
+
+
 
 def load_mnist(path, kind='train'):
 
@@ -38,6 +43,7 @@ def load_mnist(path, kind='train'):
 cwd = os.getcwd()
 
 X_all_labels, y_all_labels = load_mnist(cwd, kind='train')
+
 """
 We are only interested in the items with label 1, 5 and 7.
 Only a subset of 1000 samples per class will be used.
@@ -58,7 +64,8 @@ x_data=np.concatenate((xLabel1,xLabel5,xLabel7))
 y_data=np.concatenate((yLabel1,yLabel5,yLabel7))
 
 
-def multi_binary_class(y,label):
+
+def multi_bin_class(y,label):
     res=np.zeros(len(y))
     for i in range(len(y)):
         if y[i]==label:
@@ -77,6 +84,7 @@ def get_accuracy(y):
         elif y[i] == 7:
             res[i] = 2
     return res
+
 
 def pol_ker(x1, x2, gamma):
     k=(x1 @ x2.T +1)**gamma
@@ -101,6 +109,7 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
 
     return pred
 
+
 def get_M(alfa, y, eps, C, K):
     Y = np.eye(len(y))*y
     Q = (Y @ K)@ Y
@@ -121,16 +130,14 @@ def get_m(alfa, y, eps, C, K):
     
     return m
 
-def train(X_train, y_train, gamma, C, eps, label ):
-    solvers.options['abstol'] = 1e-15
-    solvers.options['reltol'] = 1e-15
-    solvers.options['feastol']= 1e-15
-    solvers.options['show_progress'] = False
-    y_train_converted = multi_binary_class(y_train, label)
+
+def train(x_train, y_train, gamma, C, eps,label):
+    y_train_converted = multi_bin_class(y_train, label)
     y_train_converted=y_train_converted.reshape(len(y_train),1)
     Y_train = y_train_converted*np.eye(len(y_train))
-    K = pol_ker(X_train, X_train, gamma)
-    P = matrix(np.dot(np.dot(Y_train, K), Y_train))
+    K = pol_ker(x_train, x_train, gamma)
+    
+    P = matrix(Y_train @ K @ Y_train)
     q = matrix(-np.ones(Y_train.shape[0]))
     disug = np.eye(Y_train.shape[0])
     G = matrix(np.concatenate((disug, -disug)))
@@ -138,74 +145,96 @@ def train(X_train, y_train, gamma, C, eps, label ):
     A = matrix(y_train_converted.T)
     b = matrix(np.zeros(1))
     
-    
     start = time.time()
-    sol = solvers.qp(P,q, G, h, A, b)
-    end = time.time()
-    print('Time to optimize of {} against all:'.format(label), end-start)
-    opt_time = end-start
+    opt = solvers.qp(P,q, G, h, A, b)
+    run_time= time.time() - start
+    print('Time to optimize of', label ,'against all:', run_time)
     
-    alfa_star = np.array(sol['x'])
+    alfa_star = np.array(opt['x'])
     
+    pred_train = prediction(alfa_star,x_train,x_train,y_train_converted,gamma,C,eps)
+    
+    iterations=opt['iterations']
     M = get_M(alfa_star, y_train_converted, eps, C, K)
     m = get_m(alfa_star, y_train_converted, eps, C, K)
+    kkt_viol=m-M
+    obj_fun_val=1/2*(alfa_star.T @ P @ alfa_star)-np.ones((1,len(alfa_star))) @ alfa_star
     
-    pred_train = prediction(alfa_star,X_train,X_train,y_train_converted,gamma,eps,C)
+    print('KKT Violation of', label,'against all:',kkt_viol)
+    print('Objective function value of', label, 'against all:',obj_fun_val )
     
-    print('KKT Violation of {} against all:'.format(label), M-m)
-    
-    FOB=1/2*(np.dot(np.dot(alfa_star.T,P),alfa_star))-np.dot(np.ones((1,len(alfa_star))),alfa_star)
-    print('FOB of {} against all:'.format(label),FOB )
-    iterations=sol['iterations']
-    #print('Number of solver iterations:', sol['iterations'])
-    return pred_train, alfa_star, y_train_converted, opt_time,iterations
+    return pred_train, alfa_star, y_train_converted, run_time,iterations
 
 
-def multi_class(x_train,x_test,y_train,y_test, gamma, C,epsB):
-    pred_train_1, alfa_star_1, y_train_converted_1 , run_time_1,n_it1 = train(x_train, y_train, gamma, C, eps, 1)
+def multi_class(x_train,x_test,y_train,y_test, gamma,C,eps):
     
-    pred_train_5, alfa_star_5, y_train_converted_5 , run_time_5,n_it5 = train(x_train, y_train, gamma, C, eps, 5)
+    pred_train1, alfa_star1, y_train1 , time1,n_it1 = train(x_train, y_train, gamma, C, eps, 1)
+    pred_train5, alfa_star5, y_train5 , time5,n_it5 = train(x_train, y_train, gamma, C, eps, 5)
+    pred_train7, alfa_star7, y_train7, time7,n_it7 = train(x_train, y_train, gamma, C, eps, 7)
     
-    pred_train_7, alfa_star_7, y_train_converted_7, run_time_7,n_it7 = train(x_train, y_train, gamma, C, eps, 7)
-
-    time_tot=run_time_1+run_time_5+run_time_7
+    time_tot=time1+time5+time7
     it_tot=n_it1+n_it5+n_it7
-     
-    pred_train = np.concatenate((pred_train_1, pred_train_5, pred_train_7))
     
-    class_train = pred_train.argmax(axis = 0)
+    tot_pred_train = np.concatenate((pred_train1, pred_train5, pred_train7))
     
-    y_train_acc = get_accuracy(y_train)
+    class_train = tot_pred_train.argmax(axis = 0)
     
-    acc_train = accuracy_score(y_train_acc.ravel(), class_train.ravel())
+    acc_train = accuracy_score(get_accuracy(y_train).ravel(), class_train.ravel())
+    
+    pred_test1 = prediction(alfa_star1,x_train,x_test,y_train1,gamma,C,eps)
+    pred_test5 = prediction(alfa_star5,x_train,x_test,y_train5,gamma,C,eps)
+    pred_test7 = prediction(alfa_star7,x_train,x_test,y_train7,gamma,C,eps)
+    
+    tot_pred_test = np.concatenate((pred_test1, pred_test5, pred_test7))
 
-    print('Train accuracy: ', acc_train)
-    
-    
-    pred_test_1 = prediction(alfa_star_1,x_train,x_test,y_train_converted_1,gamma,eps,C)
-    
-    pred_test_5 = prediction(alfa_star_5,x_train,x_test,y_train_converted_5,gamma,eps,C)
-
-    pred_test_7 = prediction(alfa_star_7,x_train,x_test,y_train_converted_7,gamma,eps,C)
-    
-    
-    pred_test = np.concatenate((pred_test_1, pred_test_5, pred_test_7))
-    
-    
-    class_test = pred_test.argmax(axis = 0)
-    
+    class_test = tot_pred_test.argmax(axis = 0)
     
     y_test_acc = get_accuracy(y_test)
-    
-    
     acc_test = accuracy_score(y_test_acc.ravel(), class_test.ravel())
     
     print('Test accuracy: ', acc_test)
     print('Value chosen for C:' ,C)
     print('Value chosen for gamma:' ,gamma)
+    print()
+    print('Total time to train the three classifiers:', time_tot)
+    print('Number of total iterations:',it_tot)
+    print('Train accuracy: ', acc_train)
     
     cm = confusion_matrix(y_test_acc.ravel(), class_test.ravel())
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[1,5,7])
     disp.plot()
     plt.show()
     return acc_test
+    
+
+def cross_validation(C_list, gamma_list, X_train, X_test, y_train, y_test, eps = 1e-3):
+    kf = KFold(n_splits=5)
+    best_C = 0
+    best_gamma = 0
+    best_acc_valid = 0
+    
+    for C in C_list:
+        
+        for gamma in gamma_list:
+            acc_valid = []
+            for train_index, test_index in kf.split(X_train):
+                
+                X_train_cv, X_valid = X_train[train_index], X_train[test_index]
+                y_train_cv, y_valid = y_train[train_index], y_train[test_index]
+                
+                
+                Acc_valid = multi_class(gamma, C, X_train_cv,X_valid,y_train_cv,y_valid, eps = 1e-5, num= [1, 5, 7])
+              
+                acc_valid.append(Acc_valid)
+                
+            print(np.mean(acc_valid), C, gamma)    
+            
+            if np.mean(acc_valid) > best_acc_valid:           
+                best_acc_valid = np.mean(acc_valid)
+                best_C = C
+                best_gamma = gamma
+                    
+
+    print("miglior valore di C: ", best_C)
+    print("miglior valore di gamma: ", best_gamma)
+    print("miglior validation accuracy media: ", best_acc_valid)
