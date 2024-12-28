@@ -13,7 +13,7 @@ gamma=2
 C=1
 eps = 1e-6
 tol = 1e-5
-q=4
+
 
 def load_mnist(path, kind='train'):
 
@@ -239,16 +239,16 @@ def optimum_q(params, x_train, y_train, eps,gamma,C,tol):
         acc_test_tot = 0
         print("cuurent q=", q)
 
-        for i, j in kf.split(x_train):
-            x_train_2, x_test_2 = x_train[i], x_train[j]
-            y_train_2, y_test_2 = y_train[i], y_train[j]
+        for train_index, val_index in kf.split(x_train):
+            x_train_2, x_test_2 =x_train[train_index], x_train[val_index]
+            y_train_2, y_test_2 = y_train[train_index], y_train[val_index]
             
             alfa_2= training(x_train_2,x_test_2,y_train_2,y_test_2,gamma,eps,C,q,tol)[0]
             pred_train_2 = prediction(alfa_2,x_train_2,x_train_2,y_train_2,gamma,C,eps) 
-            acc_train_tot = np.sum(pred_train_2.ravel() == y_train_2.ravel())/y_train_2.size 
+            acc_train_tot += np.sum(pred_train_2.ravel() == y_train_2.ravel())/y_train_2.size 
 
             pred_test_2 = prediction(alfa_2,x_train_2,x_test_2,y_train_2,gamma,C,eps) 
-            acc_test_tot = np.sum(pred_test_2.ravel() == y_test_2.ravel())/y_test_2.size
+            acc_test_tot += np.sum(pred_test_2.ravel() == y_test_2.ravel())/y_test_2.size
         
         avg_acc_train = acc_train_tot / kf.get_n_splits()
         avg_acc_test = acc_test_tot / kf.get_n_splits()
