@@ -14,7 +14,7 @@ solvers.options['show_progress'] = False
 
 gamma=2
 C=1
-q=4
+q=66
 eps = 1e-9
 tol = 1e-5
 

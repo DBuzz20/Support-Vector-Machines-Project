@@ -163,6 +163,7 @@ def OAA(x_train, y_train, gamma, C, eps,label):
     
     print('KKT Violation of', label,'against all:',kkt_viol)
     print('Objective function value of', label, 'against all:',obj_fun_val)
+    print('Number of iterations', iterations)
     
     return pred_train, alfa_star, y_train_multi, run_time,iterations
 
