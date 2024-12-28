@@ -11,7 +11,7 @@ from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
 gamma=2
 C=1
 eps=1e-8
-tol=1e-11
+tol=1e-5
 q=2
 
 def load_mnist(path, kind='train'):
