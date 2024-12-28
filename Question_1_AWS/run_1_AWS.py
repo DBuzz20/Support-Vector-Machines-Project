@@ -16,4 +16,4 @@ x_test = scaler.transform(x_test)
 
 #printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,kernel,alfa_star)
 
-grid_search(x_train,y_train,eps, params)
+grid_search(x_train,y_train,eps, params_C)
