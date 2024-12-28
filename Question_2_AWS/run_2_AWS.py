@@ -13,7 +13,9 @@ x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 #---------------------------------------------------------------------------------------
 
+
 alfa,run_time, acc_test,acc_train, obj_fun_val,cont,M,m,pred_test,status= training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol)
 printing_routine(y_test,M,m,run_time , acc_test,acc_train, obj_fun_val,cont,pred_test,status)
 
-#optimum_q(q_list, x_train, y_train, eps,gamma,C,tol)
+
+#optimum_q(params, x_train, y_train, eps,gamma,C,tol)

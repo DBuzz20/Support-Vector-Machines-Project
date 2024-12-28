@@ -11,9 +11,9 @@ from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
 
 gamma=2
 C=1
-eps=1e-8
-tol=1e-11
-q=80
+eps = 1e-6
+tol = 1e-5
+q=4
 
 def load_mnist(path, kind='train'):
 
@@ -113,16 +113,16 @@ def get_m(alfa, y, eps, C,grad,q):
     return m,q1_i
 
 #sia get M che m hanno K dentro ma non lo usano (una è segnato l'altra no)
-def get_Q(buffer, workers, not_workers):
-    Q_workers=[]
-    for i in workers:
-        Q_workers.append(buffer['{}'.format(i)])
+def get_Q(buffer, ws, not_ws):
+    Q_ws=[]
+    for i in ws:
+        Q_ws.append(buffer['{}'.format(i)])
         
-    Q_workers=np.array(Q_workers)
-    index=np.arange(Q_workers.shape[0])
-    Q_w = Q_workers[np.ix_(index, workers)]
-    Q_notw = Q_workers[np.ix_(index, not_workers)]
-    return Q_workers,Q_w, Q_notw
+    Q_ws=np.array(Q_ws)
+    index=np.arange(Q_ws.shape[0])
+    Q_w = Q_ws[np.ix_(index, ws)]
+    Q_nw = Q_ws[np.ix_(index, not_ws)]
+    return Q_ws,Q_w, Q_nw
 
 
 def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
@@ -158,18 +158,18 @@ def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
         
         not_w = np.delete(index_array, w)
         
-        Q_workers,Q_w,Q_notw = get_Q(buffer, w, not_w)
+        Q_ws,Q_w,Q_nw = get_Q(buffer, w, not_w)
         
-        not_var = alfa[not_w]
+        n = alfa[not_w]
         
         Q=matrix(Q_w)
-        e=matrix((Q_notw @ not_var)- np.ones((len(w),1)))
+        e=matrix((Q_nw @ n)- np.ones((len(w),1)))
         
         G=matrix(np.concatenate((np.eye(len(w)),-np.eye(len(w)))))
         h=matrix(np.concatenate((C*np.ones((len(w),1)),np.zeros((len(w),1)))))
         
         A=matrix(y_train[w].T)
-        b=matrix(-(y_train[not_w].T @ not_var))
+        b=matrix(-(y_train[not_w].T @ n))
     
         opt = solvers.qp(Q,e, G, h, A, b)
     
@@ -177,14 +177,14 @@ def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
         n_it += opt['iterations']
         
         diff = alfa_star - alfa[w]
-        grad = grad + (Q_workers.T @ diff)
+        grad = grad + (Q_ws.T @ diff)
         alfa[w] = alfa_star
         
         m, m_i = get_m(alfa, y_train, eps, C,grad,q)
         M , M_i = get_M(alfa, y_train, eps, C,grad,q)
         #print(m)
         #print(M)
-        
+    print(f"Working set indices for q={q}: {w}")    
     run_time = time.time() - start
     
     status= opt['status']
@@ -224,104 +224,50 @@ def printing_routine(y_test,M,m,run_time, acc_test,acc_train, obj_fun_val,n_it,p
   
 
 #parametri tipo [q]-----------------------------------------------------------
-params=[np.arange(4,150,step=5)]
+params = np.arange(4, 150, step=5)
 
 def optimum_q(params, x_train, y_train, eps,gamma,C,tol):
     
-    kf = KFold(n_splits=5)
-    best_acc_valid = 0
-    acc_list = []
-    tot_iter = len(params)
-    num = 1
-    y_train=y_train.reshape(len(y_train),1)
+    kf = KFold(n_splits=5, random_state=1895533, shuffle=True)
+    
+    best_acc = -float("inf")
+    
+    avg_acc_list=[]
     
     for q in params:
-            
-        print ("iteration",num, "over", tot_iter )
+        acc_train_tot = 0
+        acc_test_tot = 0
+        print("cuurent q=", q)
 
         for i, j in kf.split(x_train):
-            x_train_cv, x_valid = x_train[i], x_train[j]
-            y_train_cv, y_valid = y_train[i], y_train[j]
+            x_train_2, x_test_2 = x_train[i], x_train[j]
+            y_train_2, y_test_2 = y_train[i], y_train[j]
             
-            index_array = np.arange(x_train_cv.shape[0])
-            y_train_cv=y_train_cv.reshape(len(y_train_cv),1)
-            K=pol_ker(x_train_cv,x_train_cv,gamma)
-            Y_train_cv=y_train_cv*np.eye(len(y_train_cv))
+            alfa_2= training(x_train_2,x_test_2,y_train_2,y_test_2,gamma,eps,C,q,tol)[0]
+            pred_train_2 = prediction(alfa_2,x_train_2,x_train_2,y_train_2,gamma,C,eps) 
+            acc_train_tot = np.sum(pred_train_2.ravel() == y_train_2.ravel())/y_train_2.size 
+
+            pred_test_2 = prediction(alfa_2,x_train_2,x_test_2,y_train_2,gamma,C,eps) 
+            acc_test_tot = np.sum(pred_test_2.ravel() == y_test_2.ravel())/y_test_2.size
+        
+        avg_acc_train = acc_train_tot / kf.get_n_splits()
+        avg_acc_test = acc_test_tot / kf.get_n_splits()
+        avg_acc_list.append([avg_acc_train, avg_acc_test])
+        print(avg_acc_train)
+        print(avg_acc_test)
             
-            alfa=np.zeros((x_train_cv.shape[0], 1))
-            grad = -np.ones((len(alfa), 1))
-
-            Q=(Y_train_cv@K)@Y_train_cv
-
-            m, m_ind = get_m(alfa, y_train_cv, eps, C,grad,q)
-            M , M_ind = get_M(alfa, y_train_cv, eps, C,grad,q)
-
-            cont = 0
-            while (m - M) >= tol and cont<= 5000:
-                #print(m-M)
-                w = np.sort(np.concatenate((m_ind, M_ind)))
-
-                not_w = np.delete(index_array, w)
-
-                Q_w,Q_notw = get_Q(Q, w, not_w)
-
-                not_var = alfa[not_w]
-
-
-                Qw_m=matrix(Q_w)
-
-                e=matrix(np.dot(Q_notw, not_var)- np.ones((len(w),1)))
-                y=matrix(y_train_cv[w].T)
-                zero_ug=matrix(-np.dot(y_train_cv[not_w].T, not_var))
-                plus_minus_one=matrix(np.concatenate((np.eye(len(w)),-np.eye(len(w)))))
-                C_zero=matrix(np.concatenate((C*np.ones((len(w),1)),np.zeros((len(w),1)))))
-
-                sol = solvers.qp(Qw_m,e, plus_minus_one, C_zero, y, zero_ug)
-
-                alfa_star = np.array(sol['x'])
-                cont += sol['iterations']
-
-                grad = grad + (Q[w].T@ (alfa_star - alfa[w]))
-                alfa[w] = alfa_star
-                m, m_ind = get_m(alfa, y_train_cv, eps, C,grad, q)
-                M , M_ind = get_M(alfa, y_train_cv, eps, C,grad, q)
-            prediction_valid = prediction(alfa,x_train_cv,x_valid,y_train_cv,gamma,C,eps) 
-            Accuracy_validation = np.sum(prediction_valid.ravel() == y_valid.ravel())/y_valid.size 
-            print(Accuracy_validation)
-            acc_list.append(Accuracy_validation)
+        if avg_acc_test > best_acc:
+            print("BETTER PARAMS FOUND:")
+            print("q = ",q)
+            best_acc = avg_acc_test
+            best_params = [q]
+            print(best_acc)
+                       
+    print("List of average accuracy = ", avg_acc_list)
+    print(best_params) 
+    print(best_acc)
+    
+    return best_params
             
-        num += 1
-        
-        print(np.mean(acc_list), q)
-        if np.mean(acc_list) > best_acc_valid:
-            best_acc_valid = np.mean(acc_list)
-            best_q = q
-
-
-            acc_list = []
-
-    print("Best q: ", best_q)
-    
-    print("Best Median Accuracy: ", best_acc_valid)
-
-
-def workers_selection(workers_list,x_train,x_test,y_train,gamma,epsilon,C,tol):
-    
-    mean_times = []
-
-    for w in workers_list:
-    
-        times = []
-    
-        for i in range(10):
-        
-            tim = training(x_train,x_test,y_train,gamma,epsilon,C,w,tol)
-            times.append(tim)
-        
-        mean_time =mean(times)
-        mean_times.append(mean_time)
-    
-    print(mean_times)
-
 
 
