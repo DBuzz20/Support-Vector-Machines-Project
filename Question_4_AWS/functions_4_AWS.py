@@ -16,9 +16,6 @@ gamma=2
 C=1
 eps=1e-5
 
-
-
-
 def load_mnist(path, kind='train'):
 
     """Load MNIST data from `path`"""
@@ -131,46 +128,50 @@ def get_m(alfa, y, eps, C, K):
     return m
 
 
-def train(x_train, y_train, gamma, C, eps,label):
-    y_train_converted = multi_bin_class(y_train, label)
-    y_train_converted=y_train_converted.reshape(len(y_train),1)
-    Y_train = y_train_converted*np.eye(len(y_train))
+def OAA(x_train, y_train, gamma, C, eps,label):
+    y_train_multi = multi_bin_class(y_train, label)
+    y_train_multi=y_train_multi.reshape(len(y_train),1)
+    Y_train = y_train_multi*np.eye(len(y_train))
+    P=Y_train.shape[0]
     K = pol_ker(x_train, x_train, gamma)
     
-    P = matrix(Y_train @ K @ Y_train)
-    q = matrix(-np.ones(Y_train.shape[0]))
-    disug = np.eye(Y_train.shape[0])
-    G = matrix(np.concatenate((disug, -disug)))
-    h = matrix(np.concatenate((C*np.ones((Y_train.shape[0],1)), np.zeros((Y_train.shape[0],1)))))
-    A = matrix(y_train_converted.T)
+    Q = matrix(Y_train @ K @ Y_train)
+    e = matrix(-np.ones(P))
+    
+    G = matrix(np.concatenate(((np.eye(P)), -np.eye(P))))
+    h = matrix(np.concatenate((C*np.ones((P,1)), np.zeros((P,1)))))
+    
+    A = matrix(y_train_multi.T)
     b = matrix(np.zeros(1))
     
     start = time.time()
-    opt = solvers.qp(P,q, G, h, A, b)
+    opt = solvers.qp(Q,e, G, h, A, b)
     run_time= time.time() - start
-    print('Time to optimize of', label ,'against all:', run_time)
+    
+    print('-----------------------------------------------------------------------------------')
+    print('Time to optimize label', label ,'against all:', run_time)
     
     alfa_star = np.array(opt['x'])
     
-    pred_train = prediction(alfa_star,x_train,x_train,y_train_converted,gamma,C,eps)
+    pred_train = prediction(alfa_star,x_train,x_train,y_train_multi,gamma,C,eps)
     
     iterations=opt['iterations']
-    M = get_M(alfa_star, y_train_converted, eps, C, K)
-    m = get_m(alfa_star, y_train_converted, eps, C, K)
+    M = get_M(alfa_star, y_train_multi, eps, C, K)
+    m = get_m(alfa_star, y_train_multi, eps, C, K)
     kkt_viol=m-M
-    obj_fun_val=1/2*(alfa_star.T @ P @ alfa_star)-np.ones((1,len(alfa_star))) @ alfa_star
+    obj_fun_val=1/2*(alfa_star.T @ Q @ alfa_star)-np.ones((1,len(alfa_star))) @ alfa_star
     
     print('KKT Violation of', label,'against all:',kkt_viol)
-    print('Objective function value of', label, 'against all:',obj_fun_val )
+    print('Objective function value of', label, 'against all:',obj_fun_val)
     
-    return pred_train, alfa_star, y_train_converted, run_time,iterations
+    return pred_train, alfa_star, y_train_multi, run_time,iterations
 
 
-def multi_class(x_train,x_test,y_train,y_test, gamma,C,eps):
+def train(x_train,x_test,y_train,y_test, gamma,C,eps):
     
-    pred_train1, alfa_star1, y_train1 , time1,n_it1 = train(x_train, y_train, gamma, C, eps, 1)
-    pred_train5, alfa_star5, y_train5 , time5,n_it5 = train(x_train, y_train, gamma, C, eps, 5)
-    pred_train7, alfa_star7, y_train7, time7,n_it7 = train(x_train, y_train, gamma, C, eps, 7)
+    pred_train1, alfa_star1, y_train1 , time1,n_it1 = OAA(x_train, y_train, gamma, C, eps, 1)
+    pred_train5, alfa_star5, y_train5 , time5,n_it5 = OAA(x_train, y_train, gamma, C, eps, 5)
+    pred_train7, alfa_star7, y_train7, time7,n_it7 = OAA(x_train, y_train, gamma, C, eps, 7)
     
     time_tot=time1+time5+time7
     it_tot=n_it1+n_it5+n_it7
@@ -192,13 +193,16 @@ def multi_class(x_train,x_test,y_train,y_test, gamma,C,eps):
     y_test_acc = get_accuracy(y_test)
     acc_test = accuracy_score(y_test_acc.ravel(), class_test.ravel())
     
-    print('Test accuracy: ', acc_test)
+    print('===================================================================================')
     print('Value chosen for C:' ,C)
     print('Value chosen for gamma:' ,gamma)
+    print('Multiclass strategy: OAA')
+    print()
+    print('Train accuracy: %.3f'%acc_train)
+    print('Test accuracy: %.3f'%acc_test)
     print()
     print('Total time to train the three classifiers:', time_tot)
     print('Number of total iterations:',it_tot)
-    print('Train accuracy: ', acc_train)
     
     cm = confusion_matrix(y_test_acc.ravel(), class_test.ravel())
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[1,5,7])
@@ -207,34 +211,40 @@ def multi_class(x_train,x_test,y_train,y_test, gamma,C,eps):
     return acc_test
     
 
-def cross_validation(C_list, gamma_list, X_train, X_test, y_train, y_test, eps = 1e-3):
-    kf = KFold(n_splits=5)
-    best_C = 0
-    best_gamma = 0
-    best_acc_valid = 0
-    
-    for C in C_list:
-        
-        for gamma in gamma_list:
-            acc_valid = []
-            for train_index, test_index in kf.split(X_train):
-                
-                X_train_cv, X_valid = X_train[train_index], X_train[test_index]
-                y_train_cv, y_valid = y_train[train_index], y_train[test_index]
-                
-                
-                Acc_valid = multi_class(gamma, C, X_train_cv,X_valid,y_train_cv,y_valid, eps = 1e-5, num= [1, 5, 7])
-              
-                acc_valid.append(Acc_valid)
-                
-            print(np.mean(acc_valid), C, gamma)    
-            
-            if np.mean(acc_valid) > best_acc_valid:           
-                best_acc_valid = np.mean(acc_valid)
-                best_C = C
-                best_gamma = gamma
-                    
+params=[np.array([1,2,3,4,5,10,15,20,25,50,100]),np.arange(2,8,step=1)]
 
-    print("miglior valore di C: ", best_C)
-    print("miglior valore di gamma: ", best_gamma)
-    print("miglior validation accuracy media: ", best_acc_valid)
+def grid_search(x_train, y_train,params,eps):
+    kf = KFold(n_splits=5)
+    best_acc = 0
+    avg_acc_list=[]
+    
+    for C in params[0]:
+        for gamma in params[1]:
+            
+            acc_test_tot=0
+            print("Current hyperparameters => C: ",C,"\tgamma: ",gamma)
+            for train_index, test_index in kf.split(x_train):
+                
+                x_train_fold, x_test_fold = x_train[train_index], x_train[test_index]
+                y_train_fold, y_test_fold = y_train[train_index], y_train[test_index]
+                
+                acc_test_tot += train(x_train_fold,x_test_fold,y_train_fold,y_test_fold,gamma,C, eps)
+                
+            avg_acc_test=acc_test_tot/kf.get_n_splits()    
+            
+            avg_acc_list.append([avg_acc_test])
+            print(avg_acc_test)
+            
+            if avg_acc_test > best_acc:
+                print('BETTER PARAMS FOUND:')
+                print('C= ',C)
+                print('gamma= ',gamma)
+                best_acc = avg_acc_test
+                best_params=[C,gamma]
+                print(best_acc)
+                
+    print("List of average accuracy = ", avg_acc_list)
+    print(best_params) 
+    print(best_acc)
+    
+    return

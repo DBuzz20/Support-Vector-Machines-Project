@@ -56,6 +56,11 @@ yLabel7 = y_all_labels[indexLabel7][:1000].astype('float64')
 x_data=np.concatenate((xLabel1,xLabel5))
 y_data=np.concatenate((yLabel1,yLabel5))
 
+solvers.options['abstol'] = 1e-15
+solvers.options['reltol'] = 1e-15
+solvers.options['feastol']= 1e-15
+solvers.options['show_progress'] = False
+
 
 def binary_class(y):
     for i in range(len(y)):
@@ -110,10 +115,6 @@ def get_m(alfa, y, eps, C, K):
 
             
 def train(x_train,y_train,gamma,C):
-    solvers.options['abstol'] = 1e-15
-    solvers.options['reltol'] = 1e-15
-    solvers.options['feastol']= 1e-15
-    solvers.options['show_progress'] = False
     
     k=pol_ker(x_train,x_train,gamma)
     Y_train=np.diag(y_train)

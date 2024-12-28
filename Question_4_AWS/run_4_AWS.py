@@ -9,6 +9,6 @@ x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 #---------------------------------------------------------------------------------------
 
-multi_class(x_train,x_test,y_train,y_test,gamma, C, eps)
+train(x_train,x_test,y_train,y_test,gamma, C, eps)
 
-#printing_routine(x_train,x_test,y_train,y_test,gamma,C,eps,run_time,opt,kernel,alfa_star)
+#grid_search(x_train, y_train, params,eps)

@@ -7,10 +7,14 @@ from cvxopt import matrix, solvers
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
-
+solvers.options['abstol'] = 1e-15
+solvers.options['reltol'] = 1e-15
+solvers.options['feastol'] = 1e-15
+solvers.options['show_progress'] = False
 
 gamma=2
 C=1
+q=4
 eps = 1e-6
 tol = 1e-5
 
@@ -114,61 +118,58 @@ def get_m(alfa, y, eps, C,grad,q):
 
 #sia get M che m hanno K dentro ma non lo usano (una è segnato l'altra no)
 def get_Q(buffer, ws, not_ws):
-    Q_ws=[]
+    Q_tot=[]
     for i in ws:
-        Q_ws.append(buffer['{}'.format(i)])
+        Q_tot.append(buffer['{}'.format(i)])
         
-    Q_ws=np.array(Q_ws)
-    index=np.arange(Q_ws.shape[0])
-    Q_w = Q_ws[np.ix_(index, ws)]
-    Q_nw = Q_ws[np.ix_(index, not_ws)]
-    return Q_ws,Q_w, Q_nw
+    Q_tot=np.array(Q_tot)
+    index=np.arange(Q_tot.shape[0])
+    Q_w = Q_tot[np.ix_(index, ws)]
+    Q_nw = Q_tot[np.ix_(index, not_ws)]
+    return Q_tot,Q_w, Q_nw
 
 
 def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
-    solvers.options['abstol'] = 1e-15
-    solvers.options['reltol'] = 1e-15
-    solvers.options['feastol'] = 1e-15
-    solvers.options['show_progress'] = False
-    
-    index_array = np.arange(x_train.shape[0])
-    y_train=y_train.reshape(len(y_train),1)
+    P=y_train.shape[0]
+    index_array = np.arange(P)
+    y_train=y_train.reshape(P,1)
     K=pol_ker(x_train,x_train,gamma)
-    Y_train=y_train*np.eye(len(y_train))
+    Y_train=y_train*np.eye(P)
     
-    alfa=np.zeros((x_train.shape[0], 1))
-    grad = -np.ones((len(alfa), 1))
+    alfa=np.zeros((P, 1))
+    grad = -np.ones((P, 1))
     
     m, m_i = get_m(alfa, y_train, eps, C,grad,q)
     M , M_i = get_M(alfa, y_train, eps, C,grad,q)
+    
     buffer={}
     
     start=time.time()
     n_it = 0
     while (m - M) >= tol:
         
-        w = np.sort(np.concatenate((m_i, M_i)))
+        W_ind = np.sort(np.concatenate((m_i, M_i)))
         
-        for i in w:
+        for i in W_ind:
             if i not in buffer.keys():
                 Ke=pol_ker(x_train[i],x_train,gamma)
-                colonna=y_train[i]*(Ke@Y_train)#calcolo colonna
+                colonna=y_train[i]*(Ke@Y_train)
             
                 buffer['{}'.format(i)]=colonna
         
-        not_w = np.delete(index_array, w)
+        not_w = np.delete(index_array, W_ind)
         
-        Q_ws,Q_w,Q_nw = get_Q(buffer, w, not_w)
+        Q_ws,Q_w,Q_nw = get_Q(buffer, W_ind, not_w)
         
         n = alfa[not_w]
         
         Q=matrix(Q_w)
-        e=matrix((Q_nw @ n)- np.ones((len(w),1)))
+        e=matrix((Q_nw @ n)- np.ones((len(W_ind),1)))
         
-        G=matrix(np.concatenate((np.eye(len(w)),-np.eye(len(w)))))
-        h=matrix(np.concatenate((C*np.ones((len(w),1)),np.zeros((len(w),1)))))
+        G=matrix(np.concatenate((np.eye(len(W_ind)),-np.eye(len(W_ind)))))
+        h=matrix(np.concatenate((C*np.ones((len(W_ind),1)),np.zeros((len(W_ind),1)))))
         
-        A=matrix(y_train[w].T)
+        A=matrix(y_train[W_ind].T)
         b=matrix(-(y_train[not_w].T @ n))
     
         opt = solvers.qp(Q,e, G, h, A, b)
@@ -176,22 +177,22 @@ def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
         alfa_star = np.array(opt['x'])
         n_it += opt['iterations']
         
-        diff = alfa_star - alfa[w]
+        diff = alfa_star - alfa[W_ind]
         grad = grad + (Q_ws.T @ diff)
-        alfa[w] = alfa_star
+        alfa[W_ind] = alfa_star
         
         m, m_i = get_m(alfa, y_train, eps, C,grad,q)
         M , M_i = get_M(alfa, y_train, eps, C,grad,q)
         #print(m)
         #print(M)
-    print(f"Working set indices for q={q}: {w}")    
+    print('Working set indices for q=',q,': ',W_ind)    
     run_time = time.time() - start
     
     status= opt['status']
 
     #we have calculated the entire Q only to compute the obj_fun_val
     Q=((Y_train@K)@Y_train)
-    obj_fun_val=1/2*((alfa.T@Q@alfa))-(np.ones((1,len(alfa)))@alfa)[0][0]
+    obj_fun_val=1/2*((alfa.T @ Q @ alfa))-(np.ones((1,len(alfa))) @ alfa)[0][0]
 
     pred_train = prediction(alfa,x_train,x_train,y_train,gamma,C,eps) 
     acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size 
@@ -203,6 +204,7 @@ def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
 
 
 def printing_routine(y_test,M,m,run_time, acc_test,acc_train, obj_fun_val,n_it,pred_test,status):
+    kkt_viol=m-M
     print("C value: ",C)
     print("Gamma values: ",gamma)
     print("q value:",q)
@@ -214,7 +216,7 @@ def printing_routine(y_test,M,m,run_time, acc_test,acc_train, obj_fun_val,n_it,p
     print("Solver status: ",status)
     print("Number of iterations: ",n_it)
     print("Optimal objective function value: ",obj_fun_val)
-    print('max KKT Violation:', m-M)
+    print('max KKT Violation:',kkt_viol)
     
     cm = confusion_matrix(y_test.ravel(), pred_test.ravel()) 
     
@@ -227,7 +229,6 @@ def printing_routine(y_test,M,m,run_time, acc_test,acc_train, obj_fun_val,n_it,p
 params = np.arange(4, 150, step=5)
 
 def optimum_q(params, x_train, y_train, eps,gamma,C,tol):
-    
     kf = KFold(n_splits=5, random_state=1895533, shuffle=True)
     
     best_acc = -float("inf")
@@ -237,21 +238,23 @@ def optimum_q(params, x_train, y_train, eps,gamma,C,tol):
     for q in params:
         acc_train_tot = 0
         acc_test_tot = 0
-        print("cuurent q=", q)
+        print("current q: ", q)
 
         for train_index, val_index in kf.split(x_train):
-            x_train_2, x_test_2 =x_train[train_index], x_train[val_index]
-            y_train_2, y_test_2 = y_train[train_index], y_train[val_index]
+            x_train_fold, x_test_fold =x_train[train_index], x_train[val_index]
+            y_train_fold, y_test_fold = y_train[train_index], y_train[val_index]
             
-            alfa_2= training(x_train_2,x_test_2,y_train_2,y_test_2,gamma,eps,C,q,tol)[0]
-            pred_train_2 = prediction(alfa_2,x_train_2,x_train_2,y_train_2,gamma,C,eps) 
-            acc_train_tot += np.sum(pred_train_2.ravel() == y_train_2.ravel())/y_train_2.size 
+            alfa_fold= training(x_train_fold,x_test_fold,y_train_fold,y_test_fold,gamma,eps,C,q,tol)[0]
+            
+            pred_train = prediction(alfa_fold,x_train_fold,x_train_fold,y_train_fold,gamma,C,eps) 
+            acc_train_tot += np.sum(pred_train.ravel() == y_train_fold.ravel())/y_train_fold.size 
 
-            pred_test_2 = prediction(alfa_2,x_train_2,x_test_2,y_train_2,gamma,C,eps) 
-            acc_test_tot += np.sum(pred_test_2.ravel() == y_test_2.ravel())/y_test_2.size
+            pred_test = prediction(alfa_fold,x_train_fold,x_test_fold,y_train_fold,gamma,C,eps) 
+            acc_test_tot += np.sum(pred_test.ravel() == y_test_fold.ravel())/y_test_fold.size
         
         avg_acc_train = acc_train_tot / kf.get_n_splits()
         avg_acc_test = acc_test_tot / kf.get_n_splits()
+        
         avg_acc_list.append([avg_acc_train, avg_acc_test])
         print(avg_acc_train)
         print(avg_acc_test)
@@ -267,7 +270,7 @@ def optimum_q(params, x_train, y_train, eps,gamma,C,tol):
     print(best_params) 
     print(best_acc)
     
-    return best_params
+    return
             
 
 
