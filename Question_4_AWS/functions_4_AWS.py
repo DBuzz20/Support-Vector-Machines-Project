@@ -14,7 +14,7 @@ solvers.options['show_progress'] = False
 
 gamma=2
 C=1
-eps=1e-5
+eps=1e-9
 
 def load_mnist(path, kind='train'):
 
