@@ -129,32 +129,33 @@ def train(x_train,y_train,gamma,eps,C,q,tol):
     m, i = get_m(alfa, y_train, eps, C,grad,q)
     M , j = get_M(alfa, y_train, eps, C,grad,q)
     
-    buffer={}
+    memory={}
     
     start = time.time()
     n_it = 0
+    n_cols=0
     while (m - M) >= tol:
  
         W_ind = np.concatenate(([i, j]))
  
-        if i[0] not in buffer.keys():
-            Ker_m=pol_ker(x_train[i],x_train,gamma)
-            colonna=y_train[i]*(Ker_m @ Y_train)#calcolo colonna
-            
-            buffer['{}'.format(i[0])]=colonna  
-        else:
-            buffer=buffer
+        if i[0] not in memory.keys():
+            K_tmp=pol_ker(x_train[i],x_train,gamma)
+            #column associated with i[0]
+            col=y_train[i]*(K_tmp @ Y_train)
+            memory[i[0]]=col
+            n_cols+=1
                 
-        if j[0] not in buffer.keys():
-            Ker_M=pol_ker(x_train[j],x_train,gamma)
-            colonna=y_train[j]*(Ker_M @ Y_train)#calcolo colonna 
-            buffer['{}'.format(j[0])]=colonna
-        else:
-            buffer=buffer
-      
-        Q_tmp=np.concatenate((buffer['{}'.format(i[0])][0][i],buffer['{}'.format(i[0])][0][j],buffer['{}'.format(j[0])][0][i],buffer['{}'.format(j[0])][0][j])).reshape((2,2))
+        if j[0] not in memory.keys():
+            K_tmp=pol_ker(x_train[j],x_train,gamma)
+            #column associated with j[0]
+            col=y_train[j]*(K_tmp @ Y_train)
+            memory[j[0]]=col
+            n_cols+=1
         
-        #feasible descenti direction
+        #get elements (i,i),(i,j),(j,i),(j,j)
+        Q_tmp=np.concatenate((memory[i[0]][0][i],memory[i[0]][0][j],memory[j[0]][0][i],memory[j[0]][0][j])).reshape((2,2))
+        
+        #feasible descent direction
         fdd = np.array([y_train[i], -y_train[j]]).reshape((2,1))
         d_i=fdd[0]
         d_j=fdd[1]
@@ -175,7 +176,7 @@ def train(x_train,y_train,gamma,eps,C,q,tol):
         t_max = min(max_i,max_j)
         t_star =min(t_star,t_max)
         
-        Q_cols=np.concatenate((buffer['{}'.format(i[0])],buffer['{}'.format(j[0])]))
+        Q_cols=np.concatenate((memory[i[0]],memory[j[0]]))
         
         alfa_new=alfa[W_ind] + (t_star*fdd)
         diff=alfa_new-alfa[W_ind]
@@ -195,10 +196,10 @@ def train(x_train,y_train,gamma,eps,C,q,tol):
     
     kkt_viol=m-M
     
-    return alfa,run_time,n_it,kkt_viol,K
+    return alfa,run_time,n_it,kkt_viol,K,n_cols
 
 
-def printing_routine(x_train,x_test,y_train,y_test,gamma,eps,C,q,alfa,run_time,n_it,kkt_viol,K):
+def printing_routine(x_train,x_test,y_train,y_test,gamma,eps,C,q,alfa,run_time,n_it,kkt_viol,K,n_cols):
     P=y_train.shape[0]
     y_train=y_train.reshape(P,1)
     Y_train=y_train*np.eye(P)
@@ -210,7 +211,7 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,eps,C,q,alfa,run_time,n
     acc_test = np.sum(pred_test.ravel() == y_test.ravel())/y_test.size
     
     Q=Y_train @ K @ Y_train #needed for opt_obj_fun
-    opt_obj_fun=(1/2*(alfa.T @ Q @ alfa)-np.ones((1,len(alfa))) @ alfa) [0][0]
+    opt_obj_fun=(1/2*(alfa.T @ Q @ alfa)-np.ones((1,len(alfa))) @ alfa)
     
     print("C value: ",C)
     print("Gamma values: ",gamma)
@@ -221,10 +222,11 @@ def printing_routine(x_train,x_test,y_train,y_test,gamma,eps,C,q,alfa,run_time,n
     print()
     print("Time spent in optimization: ",run_time)
     print("Number of iterations: ",n_it)
-    print("Optimal objective function value: ",opt_obj_fun)
-    print("max KKT violation: ",kkt_viol)
+    print("Optimal objective function value: ",opt_obj_fun[0][0])
+    print("Max KKT violation: ",kkt_viol)
+    print("Number of unique columns computed:",n_cols)
     
-    cm = confusion_matrix(y_test.ravel(), pred_test.ravel()) 
+    cm = confusion_matrix(y_test.ravel(), pred_test.ravel())
     
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[1,5])
     disp.plot()

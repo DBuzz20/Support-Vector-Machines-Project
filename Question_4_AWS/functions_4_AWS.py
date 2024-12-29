@@ -61,7 +61,6 @@ x_data=np.concatenate((xLabel1,xLabel5,xLabel7))
 y_data=np.concatenate((yLabel1,yLabel5,yLabel7))
 
 
-
 def multi_bin_class(y,label):
     res=np.zeros(len(y))
     for i in range(len(y)):
@@ -81,7 +80,6 @@ def get_accuracy(y):
         elif y[i] == 7:
             res[i] = 2
     return res
-
 
 def pol_ker(x1, x2, gamma):
     k=(x1 @ x2.T +1)**gamma
@@ -106,6 +104,8 @@ def prediction(alfa,x1,x2,y,gamma,C,eps):
 
     return pred
 
+def get_predicted_label(pred):
+    return pred.argmax(axis=0)
 
 def get_M(alfa, y, eps, C, K):
     Y = np.eye(len(y))*y
@@ -148,9 +148,6 @@ def OAA(x_train, y_train, gamma, C, eps,label):
     opt = solvers.qp(Q,e, G, h, A, b)
     run_time= time.time() - start
     
-    print('-----------------------------------------------------------------------------------')
-    print('Time to optimize label', label ,'against all:', run_time)
-    
     alfa_star = np.array(opt['x'])
     
     pred_train = prediction(alfa_star,x_train,x_train,y_train_multi,gamma,C,eps)
@@ -161,9 +158,13 @@ def OAA(x_train, y_train, gamma, C, eps,label):
     kkt_viol=m-M
     obj_fun_val=1/2*(alfa_star.T @ Q @ alfa_star)-np.ones((1,len(alfa_star))) @ alfa_star
     
-    print('KKT Violation of', label,'against all:',kkt_viol)
-    print('Objective function value of', label, 'against all:',obj_fun_val)
-    print('Number of iterations', iterations)
+    print('-----------------------------------------------------------------------------------')
+    print('RESULTS OF LABEL',label,'AGAINST ALL')
+    print()
+    print('Time to optimize:', run_time)
+    print('KKT Violation:',kkt_viol)
+    print('Objective function value:',obj_fun_val[0][0])
+    print('Number of iterations:', iterations)
     
     return pred_train, alfa_star, y_train_multi, run_time,iterations
 
@@ -179,20 +180,23 @@ def train(x_train,x_test,y_train,y_test, gamma,C,eps):
     
     tot_pred_train = np.concatenate((pred_train1, pred_train5, pred_train7))
     
-    class_train = tot_pred_train.argmax(axis = 0)
+    #get predicted label for train set
+    pred_label_train = get_predicted_label(tot_pred_train)
     
-    acc_train = accuracy_score(get_accuracy(y_train).ravel(), class_train.ravel())
+    y_train_acc = get_accuracy(y_train)
+    acc_train = accuracy_score(y_train_acc.ravel(), pred_label_train.ravel())
     
     pred_test1 = prediction(alfa_star1,x_train,x_test,y_train1,gamma,C,eps)
     pred_test5 = prediction(alfa_star5,x_train,x_test,y_train5,gamma,C,eps)
     pred_test7 = prediction(alfa_star7,x_train,x_test,y_train7,gamma,C,eps)
     
     tot_pred_test = np.concatenate((pred_test1, pred_test5, pred_test7))
-
-    class_test = tot_pred_test.argmax(axis = 0)
+    
+    #get predicted labels for test set
+    pred_label_test = get_predicted_label(tot_pred_test)
     
     y_test_acc = get_accuracy(y_test)
-    acc_test = accuracy_score(y_test_acc.ravel(), class_test.ravel())
+    acc_test = accuracy_score(y_test_acc.ravel(), pred_label_test.ravel())
     
     print('===================================================================================')
     print('Value chosen for C:' ,C)
@@ -202,10 +206,10 @@ def train(x_train,x_test,y_train,y_test, gamma,C,eps):
     print('Train accuracy: %.3f'%acc_train)
     print('Test accuracy: %.3f'%acc_test)
     print()
-    print('Total time to train the three classifiers:', time_tot)
-    print('Number of total iterations:',it_tot)
+    print('Total training time:', time_tot)
+    print('Total number of iterations:',it_tot)
     
-    cm = confusion_matrix(y_test_acc.ravel(), class_test.ravel())
+    cm = confusion_matrix(y_test_acc.ravel(), pred_label_test.ravel())
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[1,5,7])
     disp.plot()
     plt.show()
@@ -214,6 +218,7 @@ def train(x_train,x_test,y_train,y_test, gamma,C,eps):
 
 params=[np.array([1,2,3,4,5,10,15,20,25,50,100]),np.arange(2,8,step=1)]
 
+#computationally very heavy (1 min per fold - 5 min per [C,gamma] pair)
 def grid_search(x_train, y_train,params,eps):
     kf = KFold(n_splits=5)
     best_acc = 0

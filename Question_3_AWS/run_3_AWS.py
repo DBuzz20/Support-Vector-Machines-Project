@@ -13,6 +13,5 @@ x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 #---------------------------------------------------------------------------------------
 
-alfa,run_time,n_it,kkt_viol,K=train(x_train,y_train,gamma,eps,C,q,tol)
-
-printing_routine(x_train,x_test,y_train,y_test,gamma,eps,C,q,alfa,run_time,n_it,kkt_viol,K)
+alfa,run_time,n_it,kkt_viol,K,n_cols=train(x_train,y_train,gamma,eps,C,q,tol)
+printing_routine(x_train,x_test,y_train,y_test,gamma,eps,C,q,alfa,run_time,n_it,kkt_viol,K,n_cols)

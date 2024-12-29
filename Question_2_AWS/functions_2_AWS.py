@@ -116,11 +116,11 @@ def get_m(alfa, y, eps, C,grad,q):
     q1_i=np.array(R, dtype = int)[q1]
     return m,q1_i
 
-#sia get M che m hanno K dentro ma non lo usano (una è segnato l'altra no)
-def get_Q(buffer, ws, not_ws):
+
+def split_Q(memory, ws, not_ws):
     Q_tot=[]
     for i in ws:
-        Q_tot.append(buffer['{}'.format(i)])
+        Q_tot.append(memory[i])
         
     Q_tot=np.array(Q_tot)
     index=np.arange(Q_tot.shape[0])
@@ -129,9 +129,9 @@ def get_Q(buffer, ws, not_ws):
     return Q_tot,Q_w, Q_nw
 
 
-def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
+def train(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
     P=y_train.shape[0]
-    index_array = np.arange(P)
+    tot_index = np.arange(P)
     y_train=y_train.reshape(P,1)
     K=pol_ker(x_train,x_train,gamma)
     Y_train=y_train*np.eye(P)
@@ -139,38 +139,37 @@ def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
     alfa=np.zeros((P, 1))
     grad = -np.ones((P, 1))
     
-    m, m_i = get_m(alfa, y_train, eps, C,grad,q)
-    M , M_i = get_M(alfa, y_train, eps, C,grad,q)
+    m, i = get_m(alfa, y_train, eps, C,grad,q)
+    M , j = get_M(alfa, y_train, eps, C,grad,q)
     
-    buffer={}
+    memory={}
     
     start=time.time()
     n_it = 0
     while (m - M) >= tol:
         
-        W_ind = np.sort(np.concatenate((m_i, M_i)))
+        W_ind = np.sort(np.concatenate((i, j)))
         
         for i in W_ind:
-            if i not in buffer.keys():
-                Ke=pol_ker(x_train[i],x_train,gamma)
-                colonna=y_train[i]*(Ke@Y_train)
-            
-                buffer['{}'.format(i)]=colonna
+            if i not in memory.keys():
+                K_tmp=pol_ker(x_train[i],x_train,gamma)
+                #column associated with i
+                col=y_train[i]*(K_tmp@Y_train)
+                #save the association i->col
+                memory[i]=col
         
-        not_w = np.delete(index_array, W_ind)
+        W_not = np.delete(tot_index, W_ind)
         
-        Q_ws,Q_w,Q_nw = get_Q(buffer, W_ind, not_w)
-        
-        n = alfa[not_w]
+        Q_tot,Q_w,Q_nw = split_Q(memory, W_ind, W_not)
         
         Q=matrix(Q_w)
-        e=matrix((Q_nw @ n)- np.ones((len(W_ind),1)))
+        e=matrix((Q_nw @ alfa[W_not])- np.ones((len(W_ind),1)))
         
         G=matrix(np.concatenate((np.eye(len(W_ind)),-np.eye(len(W_ind)))))
         h=matrix(np.concatenate((C*np.ones((len(W_ind),1)),np.zeros((len(W_ind),1)))))
         
         A=matrix(y_train[W_ind].T)
-        b=matrix(-(y_train[not_w].T @ n))
+        b=matrix(-(y_train[W_not].T @ alfa[W_not]))
     
         opt = solvers.qp(Q,e, G, h, A, b)
     
@@ -178,21 +177,20 @@ def training(x_train,x_test,y_train,y_test,gamma,eps,C,q,tol):
         n_it += opt['iterations']
         
         diff = alfa_star - alfa[W_ind]
-        grad = grad + (Q_ws.T @ diff)
+        grad = grad + (Q_tot.T @ diff)
         alfa[W_ind] = alfa_star
         
-        m, m_i = get_m(alfa, y_train, eps, C,grad,q)
-        M , M_i = get_M(alfa, y_train, eps, C,grad,q)
+        m, i = get_m(alfa, y_train, eps, C,grad,q)
+        M , j = get_M(alfa, y_train, eps, C,grad,q)
         #print(m)
-        #print(M)
-    print('Working set indices for q=',q,': ',W_ind)    
+        #print(M)  
     run_time = time.time() - start
     
     status= opt['status']
 
     #we have calculated the entire Q only to compute the obj_fun_val
-    Q=((Y_train@K)@Y_train)
-    obj_fun_val=1/2*((alfa.T @ Q @ alfa))-(np.ones((1,len(alfa))) @ alfa)[0][0]
+    Q_complete=((Y_train@K)@Y_train)
+    obj_fun_val=1/2*((alfa.T @ Q_complete @ alfa))-(np.ones((1,len(alfa))) @ alfa)
 
     pred_train = prediction(alfa,x_train,x_train,y_train,gamma,C,eps) 
     acc_train = np.sum(pred_train.ravel() == y_train.ravel())/y_train.size 
@@ -215,7 +213,7 @@ def printing_routine(y_test,M,m,run_time, acc_test,acc_train, obj_fun_val,n_it,p
     print("Time spent in optimization: ",run_time)
     print("Solver status: ",status)
     print("Number of iterations: ",n_it)
-    print("Optimal objective function value: ",obj_fun_val)
+    print("Optimal objective function value: ",obj_fun_val[0][0])
     print('max KKT Violation:',kkt_viol)
     
     cm = confusion_matrix(y_test.ravel(), pred_test.ravel()) 
@@ -244,7 +242,7 @@ def optimum_q(params, x_train, y_train, eps,gamma,C,tol):
             x_train_fold, x_test_fold =x_train[train_index], x_train[val_index]
             y_train_fold, y_test_fold = y_train[train_index], y_train[val_index]
             
-            alfa_fold= training(x_train_fold,x_test_fold,y_train_fold,y_test_fold,gamma,eps,C,q,tol)[0]
+            alfa_fold= train(x_train_fold,x_test_fold,y_train_fold,y_test_fold,gamma,eps,C,q,tol)[0]
             
             pred_train = prediction(alfa_fold,x_train_fold,x_train_fold,y_train_fold,gamma,C,eps) 
             acc_train_tot += np.sum(pred_train.ravel() == y_train_fold.ravel())/y_train_fold.size 
