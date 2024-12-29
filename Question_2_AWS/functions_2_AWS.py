@@ -16,7 +16,7 @@ gamma=2
 C=1
 q=66
 eps = 1e-9
-tol = 1e-5
+tol = 1e-10
 
 
 def load_mnist(path, kind='train'):
