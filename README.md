@@ -4,7 +4,7 @@ Project for the "Optimization Methods for Machine Learning" course.
 Master's degree course in "Business Intelligence and Analytics" (Management engineering's curricula).
 
 ## Project Description
-The project, developed in `Python`, involves the implementation of various approaches and techniques regarding `Support Vector Machines` in machine learning.
+The project, developed in `Python`, involves the implementation of various approaches and techniques regarding `Support Vector Machines` in machine learning, putting particular emphasis on the optimization side of the developement.
 
 The 4 implementations of the project required developing concepts like: Dual SVM, gradient method, grid search (with kfold cross validation), SVM light and worker's selection, Sequential Minimal Optimization with Most violating pair, multi-class SVM ecc.
 
